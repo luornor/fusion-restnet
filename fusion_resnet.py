@@ -125,8 +125,8 @@ class ICALayer(nn.Module):
 
     def __init__(self, U: np.ndarray, M: np.ndarray):
         super().__init__()
-        self.register_buffer('U', torch.tensor(U, dtype=torch.float64))
-        self.register_buffer('M', torch.tensor(M, dtype=torch.float64))
+        self.register_buffer('U', torch.from_numpy(np.array(U, dtype=np.float64)))
+        self.register_buffer('M', torch.from_numpy(np.array(M, dtype=np.float64)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return (x - self.M) @ self.U.T
@@ -137,8 +137,8 @@ class NormalizeLayer(nn.Module):
 
     def __init__(self, m: np.ndarray, s: np.ndarray):
         super().__init__()
-        self.register_buffer('m', torch.tensor(m, dtype=torch.float64))
-        self.register_buffer('s', torch.tensor(s, dtype=torch.float64))
+        self.register_buffer('m', torch.from_numpy(np.array(m, dtype=np.float64)))
+        self.register_buffer('s', torch.from_numpy(np.array(s, dtype=np.float64)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = torch.exp(x)
@@ -161,7 +161,7 @@ class FryzeDecomposition(nn.Module):
         n_cycles = signal_length // emb_size
         t = np.linspace(0, 1 / 60, emb_size)
         v = 120 * np.sqrt(2) * np.sin(2 * np.pi * 60 * t)
-        self.register_buffer('voltage', torch.tensor(v, dtype=torch.float64))
+        self.register_buffer('voltage', torch.from_numpy(np.array(v, dtype=np.float64)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -623,7 +623,9 @@ def model_summary(model: nn.Module, input_shape: tuple = (1, 400)):
     print(f"Param memory (fp32):  {param_size_mb / 2:>10.1f} MB")
 
     # Forward pass memory estimate (rough)
-    x = torch.randn(*input_shape, dtype=torch.float64)
+    device = next(model.parameters()).device
+    model_dtype = next(model.parameters()).dtype
+    x = torch.randn(*input_shape, dtype=model_dtype, device=device)
     with torch.no_grad():
         try:
             _ = model(x)
