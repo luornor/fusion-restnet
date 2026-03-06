@@ -1,0 +1,8 @@
+# Deployment dependencies (CPU-only, minimal)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.2.0
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+pydantic>=2.0.0
