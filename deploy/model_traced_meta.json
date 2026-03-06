@@ -1,9 +1,0 @@
-{
-  "n_classes": 15,
-  "signal_length": 400,
-  "threshold": 0.3842105269432068,
-  "epoch": 186,
-  "best_val_f1": 0.8021629559538831,
-  "format": "torchscript_traced",
-  "dtype": "float32"
-}
