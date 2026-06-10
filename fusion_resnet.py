@@ -153,16 +153,16 @@ class FryzeDecomposition(nn.Module):
     """
 
     def __init__(self, signal_length: int = 400, emb_size: int = 50,
-                 mains_freq: float = 60.0):
+                 mains_freq: float = 60.0, mains_voltage: float = 120.0):
         super().__init__()
         self.signal_length = signal_length
         self.emb_size = emb_size
 
         # Pre-compute one-cycle synthetic voltage waveform.
-        # mains_freq must match the grid frequency of the recorded data
-        # (60 Hz for PLAID/US, 50 Hz for Ghana/Europe).
+        # mains_freq / mains_voltage must match the grid of the recorded data
+        # (60 Hz / 120 V for PLAID/US; 50 Hz / 230 V for Ghana/Europe).
         t = np.linspace(0, 1 / mains_freq, emb_size, endpoint=False)
-        v = 120 * np.sqrt(2) * np.sin(2 * np.pi * mains_freq * t)
+        v = mains_voltage * np.sqrt(2) * np.sin(2 * np.pi * mains_freq * t)
         self.register_buffer('voltage', torch.from_numpy(np.array(v, dtype=np.float64)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -285,12 +285,15 @@ class FryzeBranch(nn.Module):
         channels: list[int] = None,
         dropout: float = 0.1,
         mains_freq: float = 60.0,
+        mains_voltage: float = 120.0,
     ):
         super().__init__()
         if channels is None:
             channels = [32, 64, 128]
 
-        self.fryze = FryzeDecomposition(signal_length, emb_size, mains_freq=mains_freq)
+        self.fryze = FryzeDecomposition(signal_length, emb_size,
+                                        mains_freq=mains_freq,
+                                        mains_voltage=mains_voltage)
 
         # Input has 2 channels (active, non-active)
         self.stem = nn.Sequential(
@@ -455,6 +458,7 @@ class FusionResNet(nn.Module):
         dropout: float = 0.1,
         emb_size: int = 50,
         mains_freq: float = 60.0,
+        mains_voltage: float = 120.0,
     ):
         super().__init__()
 
@@ -486,6 +490,7 @@ class FusionResNet(nn.Module):
             channels=branch_channels,
             dropout=dropout,
             mains_freq=mains_freq,
+            mains_voltage=mains_voltage,
         )
 
         # --- Branch 4: FFT features ---
@@ -892,6 +897,7 @@ class FusionResNetLite(FusionResNet):
         dropout: float = 0.15,
         emb_size: int = 50,
         mains_freq: float = 60.0,
+        mains_voltage: float = 120.0,
     ):
         super().__init__(
             n_classes=n_classes,
@@ -902,6 +908,7 @@ class FusionResNetLite(FusionResNet):
             dropout=dropout,
             emb_size=emb_size,
             mains_freq=mains_freq,
+            mains_voltage=mains_voltage,
         )
 
 

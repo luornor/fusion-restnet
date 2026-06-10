@@ -98,7 +98,9 @@ def parse_args():
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--dropout', type=float, default=0.1, help='Dropout rate')
     parser.add_argument('--fp32', action='store_true',
-                        help='Use float32 instead of float64 (saves VRAM)')
+                        help='(Deprecated — float32 is now the default. Has no effect.)')
+    parser.add_argument('--fp64', action='store_true',
+                        help='Use float64 instead of float32 (higher precision, more VRAM)')
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
     parser.add_argument('--data-dir', type=str, default='data', help='Data directory')
     parser.add_argument('--save-dir', type=str, default='checkpoints/fusion_resnet',
@@ -143,9 +145,11 @@ def parse_args():
     # --- Calibration ---
     parser.add_argument('--calibrate', action='store_true',
                         help='Post-training temperature scaling calibration on validation set')
-    # --- Grid frequency ---
+    # --- Grid parameters ---
     parser.add_argument('--mains-freq', type=float, default=60.0,
                         help='Mains grid frequency in Hz (default: 60 for PLAID/US; use 50 for Ghana/Europe)')
+    parser.add_argument('--mains-volt', type=float, default=120.0,
+                        help='Mains RMS voltage in V (default: 120 for PLAID/US; use 230 for Ghana/Europe)')
     return parser.parse_args()
 
 
@@ -983,7 +987,7 @@ def main():
         print("CUDA not available, falling back to CPU")
         args.device = 'cpu'
 
-    dtype = torch.float32 if args.fp32 else torch.float64
+    dtype = torch.float64 if args.fp64 else torch.float32
     print(f"Device: {args.device} | Dtype: {dtype} | Variant: {args.variant}")
 
     if args.device == 'cuda':
@@ -1089,6 +1093,7 @@ def main():
         U=U, M=M, m=m, s=s,
         dropout=args.dropout,
         mains_freq=args.mains_freq,
+        mains_voltage=args.mains_volt,
     )
 
     if dtype == torch.float64:
