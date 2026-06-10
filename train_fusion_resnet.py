@@ -114,9 +114,38 @@ def parse_args():
     parser.add_argument('--snapshot-every', type=int, default=25,
                         help='Also save epoch snapshots every N epochs (default: 25, 0 disables)')
     parser.add_argument('--early-stopping-patience', type=int, default=0,
-                        help='Stop if validation F1 does not improve for N epochs (0 disables)')
+                        help='Stop if validation F1 does not improve for N epochs (0 disables, recommended: 40)')
     parser.add_argument('--early-stopping-min-delta', type=float, default=0.0,
                         help='Minimum validation F1 improvement to reset early stopping')
+    # --- Optimizer / scheduler ---
+    parser.add_argument('--weight-decay', type=float, default=1e-4,
+                        help='AdamW weight decay (default: 1e-4; try 5e-4 or 1e-3 with synthetic data)')
+    parser.add_argument('--scheduler-factor', type=float, default=0.8,
+                        help='ReduceLROnPlateau LR reduction factor (default: 0.8; try 0.5)')
+    parser.add_argument('--scheduler-patience', type=int, default=15,
+                        help='ReduceLROnPlateau patience in epochs (default: 15; try 10)')
+    parser.add_argument('--warmup-epochs', type=int, default=0,
+                        help='Linear LR warmup epochs from --warmup-start-lr to --lr (0=disabled; recommended: 5)')
+    parser.add_argument('--warmup-start-lr', type=float, default=1e-5,
+                        help='Starting LR for linear warmup (default: 1e-5)')
+    # --- Loss function ---
+    parser.add_argument('--use-pos-weight', action='store_true',
+                        help='Weight BCEWithLogitsLoss by inverse class frequency in training labels')
+    # --- Source-level augmentation (applied before mixture composition) ---
+    parser.add_argument('--aug-noise-sigma', type=float, default=0.0,
+                        help='Gaussian noise sigma as fraction of signal RMS (0=off; try 0.02)')
+    parser.add_argument('--aug-amplitude-scale', type=float, default=0.0,
+                        help='Max amplitude perturbation fraction (0=off; try 0.15)')
+    parser.add_argument('--aug-phase-shift', action='store_true',
+                        help='Random cyclic phase shift of source signatures')
+    parser.add_argument('--aug-time-warp', action='store_true',
+                        help='Time-warping ±5%% on source signatures (optional; adds compute)')
+    # --- Calibration ---
+    parser.add_argument('--calibrate', action='store_true',
+                        help='Post-training temperature scaling calibration on validation set')
+    # --- Grid frequency ---
+    parser.add_argument('--mains-freq', type=float, default=60.0,
+                        help='Mains grid frequency in Hz (default: 60 for PLAID/US; use 50 for Ghana/Europe)')
     return parser.parse_args()
 
 
@@ -132,10 +161,78 @@ def set_seed(seed: int):
 # Data Pipeline (from original project)
 # ==============================================================================
 
+class SignatureAugmentor:
+    """Applies configurable augmentations to individual source signatures.
+
+    Called per-signature BEFORE mixture composition, so each training mixture
+    contains uniquely perturbed source waveforms.  Labels are never modified.
+    Validation and test data must NOT use augmentation.
+
+    All augmentations are independently configurable and off by default.
+    """
+
+    def __init__(
+        self,
+        noise_sigma: float = 0.0,
+        amplitude_scale: float = 0.0,
+        phase_shift: bool = False,
+        time_warp: bool = False,
+        seed: int = 42,
+    ):
+        self.noise_sigma = noise_sigma
+        self.amplitude_scale = amplitude_scale
+        self.phase_shift = phase_shift
+        self.time_warp = time_warp
+        self._rng = np.random.RandomState(seed)
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        x = x.copy()
+        rms = float(np.sqrt(np.mean(x ** 2))) + 1e-8
+
+        if self.noise_sigma > 0:
+            x = x + self._rng.normal(0, self.noise_sigma * rms, size=x.shape)
+
+        if self.amplitude_scale > 0:
+            scale = 1.0 + self._rng.uniform(-self.amplitude_scale, self.amplitude_scale)
+            x = x * scale
+
+        if self.phase_shift:
+            shift = self._rng.randint(0, len(x))
+            x = np.roll(x, shift)
+
+        if self.time_warp:
+            factor = 1.0 + self._rng.uniform(-0.05, 0.05)
+            n = len(x)
+            new_n = max(1, int(round(n * factor)))
+            x_warped = np.interp(
+                np.linspace(0, n - 1, new_n),
+                np.arange(n), x,
+            )
+            x = x_warped[:n] if new_n >= n else np.pad(x_warped, (0, n - new_n), mode='edge')
+
+        return x
+
+    def is_active(self) -> bool:
+        return (self.noise_sigma > 0 or self.amplitude_scale > 0
+                or self.phase_shift or self.time_warp)
+
+    def summary(self) -> str:
+        parts = []
+        if self.noise_sigma > 0:
+            parts.append(f'noise_sigma={self.noise_sigma}')
+        if self.amplitude_scale > 0:
+            parts.append(f'amplitude_scale={self.amplitude_scale}')
+        if self.phase_shift:
+            parts.append('phase_shift=True')
+        if self.time_warp:
+            parts.append('time_warp=True')
+        return ', '.join(parts) if parts else 'none'
+
+
 class Composer:
     """Generates mixture signals from individual appliance signatures."""
 
-    def __init__(self, X, y, random_state=None):
+    def __init__(self, X, y, random_state=None, augmentor=None):
         self._X = X
         self._y = y
         self._classes = np.unique(y)
@@ -149,6 +246,7 @@ class Composer:
         else:
             modified_seed = random_state
         self._rng = np.random.RandomState(modified_seed)
+        self._augmentor = augmentor
 
     @property
     def classes(self):
@@ -213,8 +311,10 @@ class Composer:
 
     def compose_single(self, Ii):
         Ii = np.asarray(Ii)
-        x = self._X[Ii]
+        x = self._X[Ii].copy()
         y = self._y[np.asarray(Ii)]
+        if self._augmentor is not None and self._augmentor.is_active():
+            x = np.stack([self._augmentor(xi) for xi in x])
         x = np.sum(x, axis=0)
         y = np.unique(y)
         return x, y
@@ -232,11 +332,16 @@ class Composer:
 
 
 def compose(X, y, n_classes, n_samples_per_component, n_min=1, n_max=None,
-            min_freqs=1, max_freqs=10, share=1.0):
-    """Generate mixture signals from individual signatures."""
+            min_freqs=1, max_freqs=10, share=1.0, augmentor=None):
+    """Generate mixture signals from individual signatures.
+
+    Args:
+        augmentor: Optional SignatureAugmentor applied to each source signature
+                   before composition. Must be None for val/test data.
+    """
     if n_max is None:
         n_max = n_classes
-    c = Composer(X, y, random_state=42)
+    c = Composer(X, y, random_state=42, augmentor=augmentor)
     X_out = np.empty((0, X.shape[1]))
     Y_out = np.empty((0, n_classes))
     lenc = MultiLabelBinarizer(classes=np.unique(y))
@@ -288,6 +393,19 @@ def f1_with_logits(y_pred, y_test, threshold=0.5, average='samples'):
 # ==============================================================================
 # Training Engine
 # ==============================================================================
+
+def compute_pos_weight(Y_train: np.ndarray, device: str, dtype: torch.dtype) -> torch.Tensor:
+    """BCE pos_weight = neg_count / pos_count per class.
+
+    Passed to BCEWithLogitsLoss to upweight underrepresented positive labels.
+    Only use this if per-class label counts are confirmed to be imbalanced.
+    """
+    n = len(Y_train)
+    n_pos = Y_train.sum(axis=0).clip(min=1)
+    n_neg = n - n_pos
+    weights = n_neg / n_pos
+    return torch.tensor(weights, dtype=dtype, device=device)
+
 
 def train_epoch(model, loader, loss_fn, optimizer, device, dtype, threshold=0.5):
     model.train()
@@ -350,7 +468,8 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
                 num_epochs, device, dtype, save_dir='', checkpoint_meta=None,
                 start_epoch=0, best_val=0.0, history=None, save_every=1,
                 snapshot_every=25, early_stopping_patience=0,
-                early_stopping_min_delta=0.0):
+                early_stopping_min_delta=0.0,
+                warmup_epochs=0, warmup_start_lr=1e-5):
     if history is None:
         history = {
             "train": {"loss": [], "score": []},
@@ -367,9 +486,22 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
     model_version = checkpoint_meta.get('model_version', '0.0.1-dev') if checkpoint_meta else '0.0.1-dev'
     best_versioned_path = os.path.join(save_dir, f"latest_v{model_version}.pt")
     last_versioned_path = os.path.join(save_dir, f"last_v{model_version}.pt")
+    base_lr = optimizer.param_groups[0]['lr']
 
     for epoch in range(start_epoch, num_epochs):
         t0 = time.time()
+
+        # Linear LR warmup: only applies to the first `warmup_epochs` steps of
+        # this run.  The plateau scheduler is held off during warmup so its
+        # internal patience counter doesn't start decaying before training is
+        # fully warmed up.
+        effective_epoch = epoch - start_epoch
+        in_warmup = warmup_epochs > 0 and effective_epoch < warmup_epochs
+        if in_warmup:
+            progress = (effective_epoch + 1) / warmup_epochs
+            warmup_lr = warmup_start_lr + (base_lr - warmup_start_lr) * progress
+            for pg in optimizer.param_groups:
+                pg['lr'] = warmup_lr
 
         train_stats = train_epoch(
             model, train_loader, loss_fn, optimizer, device, dtype,
@@ -382,7 +514,7 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
         history["val"]["loss"].append(val_stats['val/loss'])
         history["val"]["score"].append(val_stats['val/score'])
 
-        if scheduler:
+        if scheduler and not in_warmup:
             scheduler.step(val_stats['val/loss'])
 
         history['threshold'].append(val_stats.get('threshold', 0.5))
@@ -899,10 +1031,23 @@ def main():
     X_val, X_test, y_val, y_test = train_test_split(
         X_test, y_test, test_size=0.7, random_state=42, stratify=y_test)
 
-    # Generate mixture signals
+    # Build source-level augmentor (train split only; val/test must stay clean)
+    augmentor = None
+    if any([args.aug_noise_sigma > 0, args.aug_amplitude_scale > 0,
+            args.aug_phase_shift, args.aug_time_warp]):
+        augmentor = SignatureAugmentor(
+            noise_sigma=args.aug_noise_sigma,
+            amplitude_scale=args.aug_amplitude_scale,
+            phase_shift=args.aug_phase_shift,
+            time_warp=args.aug_time_warp,
+            seed=args.seed,
+        )
+        print(f"  Source augmentation: {augmentor.summary()}")
+
+    # Generate mixture signals (augmentor applied only to training data)
     X_train, Y_train = compose(
         X_train, y_train, n_classes, args.n_samples,
-        share=len(X_train) / len(X_real))
+        share=len(X_train) / len(X_real), augmentor=augmentor)
     X_val, Y_val = compose(
         X_val, y_val, n_classes, args.n_samples,
         share=len(X_val) / len(X_real))
@@ -943,6 +1088,7 @@ def main():
         signal_length=signal_length,
         U=U, M=M, m=m, s=s,
         dropout=args.dropout,
+        mains_freq=args.mains_freq,
     )
 
     if dtype == torch.float64:
@@ -965,9 +1111,20 @@ def main():
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False,
                             num_workers=0, pin_memory=(args.device == 'cuda'))
 
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=15, min_lr=1e-7)
-    loss_fn = nn.BCEWithLogitsLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = ReduceLROnPlateau(
+        optimizer, 'min',
+        factor=args.scheduler_factor,
+        patience=args.scheduler_patience,
+        min_lr=1e-7,
+    )
+
+    if args.use_pos_weight:
+        pw = compute_pos_weight(Y_train, args.device, dtype)
+        loss_fn = nn.BCEWithLogitsLoss(pos_weight=pw)
+        print(f"  pos_weight range: [{pw.min().item():.2f}, {pw.max().item():.2f}]")
+    else:
+        loss_fn = nn.BCEWithLogitsLoss()
 
     start_epoch = 0
     best_val = 0.0
@@ -1003,6 +1160,8 @@ def main():
         snapshot_every=args.snapshot_every,
         early_stopping_patience=args.early_stopping_patience,
         early_stopping_min_delta=args.early_stopping_min_delta,
+        warmup_epochs=args.warmup_epochs,
+        warmup_start_lr=args.warmup_start_lr,
     )
 
     # ------------------------------------------------------------------
@@ -1036,8 +1195,54 @@ def main():
         appliance_names=appliance_names, batch_size=args.batch_size,
     )
 
-    # Save metrics to JSON
+    # Save raw probabilities for calibration diagnostics
     os.makedirs(args.figures_dir, exist_ok=True)
+    np.save(os.path.join(args.figures_dir, 'Y_prob.npy'), Y_prob)
+    np.save(os.path.join(args.figures_dir, 'Y_true.npy'), Y_test)
+
+    # Post-training temperature scaling calibration
+    if args.calibrate:
+        print("\n  Running temperature scaling calibration on validation set...")
+        try:
+            from temperature_scaling import TemperatureScaler
+            # Collect validation logits with best model
+            val_logits_list = []
+            with torch.no_grad():
+                model.eval()
+                for i in range(0, len(X_val), args.batch_size):
+                    batch = torch.tensor(X_val[i:i + args.batch_size], dtype=dtype, device=args.device)
+                    val_logits_list.append(model(batch).cpu().numpy())
+            val_logits = np.concatenate(val_logits_list, axis=0)
+            n_half = len(val_logits) // 2
+            cal_logits, rep_logits = val_logits[:n_half], val_logits[n_half:]
+            cal_labels, rep_labels = Y_val[:n_half], Y_val[n_half:]
+
+            scaler = TemperatureScaler()
+            scaler.fit(cal_logits, cal_labels)
+            cal_threshold = scaler.find_best_threshold(cal_logits, cal_labels)
+            cal_metrics = scaler.calibration_metrics(rep_logits, rep_labels)
+
+            print(f"  Calibrated threshold: {cal_threshold:.4f} (was {threshold:.4f})")
+            print(f"  ECE: {cal_metrics['ece_before']:.4f} → {cal_metrics['ece_after']:.4f}")
+
+            import json as _json
+            cal_metrics['calibrated_threshold'] = cal_threshold
+            cal_metrics['uncalibrated_threshold'] = float(threshold)
+            with open(os.path.join(args.figures_dir, 'calibration_metrics.json'), 'w') as f:
+                _json.dump(cal_metrics, f, indent=2)
+            print(f"  Saved: {args.figures_dir}/calibration_metrics.json")
+
+            # Re-evaluate test set with calibrated logits + threshold
+            test_logits = np.log(Y_prob.clip(1e-7, 1 - 1e-7)) - np.log(1 - Y_prob.clip(1e-7, 1 - 1e-7))
+            cal_test_probs = 1.0 / (1.0 + np.exp(-scaler.scale(test_logits)))
+            Y_pred_cal = (cal_test_probs >= cal_threshold).astype(int)
+            from sklearn.metrics import f1_score as _f1
+            f1_cal = _f1(Y_test, Y_pred_cal, average='samples', zero_division=0)
+            print(f"  Calibrated test F1 (samples): {f1_cal:.4f} (uncalibrated: {metrics['f1_samples']:.4f})")
+        except ImportError:
+            print("  [skip] temperature_scaling.py not found")
+
+    # Save metrics to JSON
     import json
     metrics_serializable = {k: v for k, v in metrics.items() if k != 'per_class'}
     metrics_serializable['per_class'] = {

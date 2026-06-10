@@ -152,15 +152,17 @@ class FryzeDecomposition(nn.Module):
     and a synthetic voltage waveform is generated internally.
     """
 
-    def __init__(self, signal_length: int = 400, emb_size: int = 50):
+    def __init__(self, signal_length: int = 400, emb_size: int = 50,
+                 mains_freq: float = 60.0):
         super().__init__()
         self.signal_length = signal_length
         self.emb_size = emb_size
 
-        # Pre-compute voltage waveform (US 60Hz mains)
-        n_cycles = signal_length // emb_size
-        t = np.linspace(0, 1 / 60, emb_size)
-        v = 120 * np.sqrt(2) * np.sin(2 * np.pi * 60 * t)
+        # Pre-compute one-cycle synthetic voltage waveform.
+        # mains_freq must match the grid frequency of the recorded data
+        # (60 Hz for PLAID/US, 50 Hz for Ghana/Europe).
+        t = np.linspace(0, 1 / mains_freq, emb_size, endpoint=False)
+        v = 120 * np.sqrt(2) * np.sin(2 * np.pi * mains_freq * t)
         self.register_buffer('voltage', torch.from_numpy(np.array(v, dtype=np.float64)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -282,12 +284,13 @@ class FryzeBranch(nn.Module):
         emb_size: int = 50,
         channels: list[int] = None,
         dropout: float = 0.1,
+        mains_freq: float = 60.0,
     ):
         super().__init__()
         if channels is None:
             channels = [32, 64, 128]
 
-        self.fryze = FryzeDecomposition(signal_length, emb_size)
+        self.fryze = FryzeDecomposition(signal_length, emb_size, mains_freq=mains_freq)
 
         # Input has 2 channels (active, non-active)
         self.stem = nn.Sequential(
@@ -451,6 +454,7 @@ class FusionResNet(nn.Module):
         fused_dim: int = 256,
         dropout: float = 0.1,
         emb_size: int = 50,
+        mains_freq: float = 60.0,
     ):
         super().__init__()
 
@@ -481,6 +485,7 @@ class FusionResNet(nn.Module):
             emb_size=emb_size,
             channels=branch_channels,
             dropout=dropout,
+            mains_freq=mains_freq,
         )
 
         # --- Branch 4: FFT features ---
@@ -886,6 +891,7 @@ class FusionResNetLite(FusionResNet):
         s: np.ndarray = None,
         dropout: float = 0.15,
         emb_size: int = 50,
+        mains_freq: float = 60.0,
     ):
         super().__init__(
             n_classes=n_classes,
@@ -895,6 +901,7 @@ class FusionResNetLite(FusionResNet):
             fused_dim=128,
             dropout=dropout,
             emb_size=emb_size,
+            mains_freq=mains_freq,
         )
 
 

@@ -1,0 +1,16 @@
+appliance,f1_v0_0_1,precision_v0_0_1,recall_v0_0_1,support_test,f1_earlystop,precision_earlystop,recall_earlystop,f1_delta,precision_delta,notes
+Air Conditioner,0.7711,0.6762,0.8969,3386,0.7566,0.6403,0.9247,-0.0145,-0.0359,High recall both runs; persistent false positives
+Coffee maker,0.8317,0.7571,0.9225,3305,0.8146,0.7309,0.9198,-0.0171,-0.0262,Moderate; possibly confused with heater
+Compact Fluorescent Lamp,0.8636,0.8755,0.8520,3358,0.8174,0.7903,0.8463,-0.0462,-0.0852,CFL distinctive but earlystop shows precision drop
+Fan,0.7528,0.6550,0.8850,3331,0.7414,0.6220,0.9174,-0.0114,-0.0330,Weak precision; likely confused with AC/ILB
+Fridge,0.8383,0.8409,0.8357,3359,0.8309,0.7625,0.9128,-0.0074,-0.0784,Relatively robust
+Hair Iron,0.8640,0.8373,0.8926,3425,0.8157,0.7762,0.8596,-0.0483,-0.0611,Notable degradation in earlystop
+Hairdryer,0.8644,0.8369,0.8938,3371,0.8269,0.7624,0.9033,-0.0375,-0.0745,Degradation in earlystop
+Heater,0.8713,0.8478,0.8963,3355,0.8458,0.8311,0.8611,-0.0255,-0.0167,Reasonably robust
+Incandescent Light Bulb,0.7419,0.6338,0.8943,3310,0.7390,0.6206,0.9133,-0.0029,-0.0132,Weak precision both runs
+Laptop,0.9246,0.9331,0.9163,3334,0.8658,0.9499,0.7954,-0.0588,+0.0168,Large recall drop in earlystop; distinctive load
+Microwave,0.9940,0.9973,0.9908,3355,0.9918,0.9931,0.9905,-0.0022,-0.0042,Excellent both runs; highly distinctive
+Soldering Iron,0.7422,0.6439,0.8760,3307,0.7421,0.6226,0.9184,-0.0001,-0.0213,Weak precision; likely rare signature count
+Vacuum,0.9334,0.9164,0.9510,3411,0.9100,0.8733,0.9499,-0.0234,-0.0431,Strong both runs
+Washing Machine,0.8205,0.7589,0.8928,3396,0.7912,0.6775,0.9508,-0.0293,-0.0814,Notable precision drop in earlystop
+Water kettle,0.8482,0.7908,0.9146,3347,0.8293,0.7821,0.8826,-0.0189,-0.0087,Moderate; similar to heater signature
