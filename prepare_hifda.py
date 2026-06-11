@@ -1,404 +1,937 @@
 #!/usr/bin/env python3
 """
-Preprocess HIFDA dataset for Fusion-ResNet NILM training.
+prepare_hifda.py ? Preprocess HIFDA for Fusion-ResNet NILM training.
 
-HIFDA (High-resolution Individual Appliance Current Dataset):
-  DOI: 10.1038/s41597-025-04859-3
-  Source: https://zenodo.org/records/14886758
-  Sampling rate: 100 kHz  |  Grid: 50 Hz / 230 V (Spain)
+Produces arrays that exactly match the schema of the existing PLAID X_real.npy / y_real.npy.
 
-Outputs (saved to --out-dir, default: data/):
-  X_hifda.npy          -- (N, 400) float32 normalized current windows
-  y_hifda.npy          -- (N,)     int   class labels (same index space as PLAID)
-  X_combined.npy       -- X_real + X_hifda merged (if --merge and X_real.npy exists)
-  y_combined.npy       -- matching labels
+Usage examples:
+  # Dry-run (inspect only, no files written):
+  python prepare_hifda.py --hifda-dir C:/path/to/HIFDA_HF_electrical_signals_dataset --dry-run
 
-Usage (HIFDA only):
-  python prepare_hifda.py --hifda-dir /path/to/hifda
+  # Generate HIFDA-only arrays (safe classes only):
+  python prepare_hifda.py --hifda-dir C:/path/to/HIFDA_HF_electrical_signals_dataset \
+      --out-dir data/hifda --reference-data-dir data --exclude-uncertain
 
-Usage (merge with existing PLAID):
-  python prepare_hifda.py --hifda-dir /path/to/hifda --merge --data-dir data
+  # Include uncertain classes (iron -> Hair Iron, light -> ILB):
+  python prepare_hifda.py --hifda-dir C:/path/to/HIFDA_HF_electrical_signals_dataset \
+      --out-dir data/hifda --reference-data-dir data --include-uncertain
 
-Usage (train after this script):
-  python train_fusion_resnet.py --data-dir data --mains-freq 50 --mains-volt 230 \
-      --model-version hifda-v1 [--variant lite] [--device cuda]
+  # Merge with PLAID:
+  python prepare_hifda.py --hifda-dir C:/path/to/HIFDA_HF_electrical_signals_dataset \
+      --out-dir data --reference-data-dir data --merge --exclude-uncertain
 
-  For a PLAID+HIFDA combined run use --data-dir pointing at X_combined.npy / y_combined.npy.
-  NOTE: Mixed-frequency training (60 Hz PLAID + 50 Hz HIFDA) requires --mains-freq 50
-  because the Fryze branch uses a single grid reference. Training at 50 Hz on the combined
-  set slightly degrades PLAID-derived features, but the 50 Hz representation is what Ghana
-  hardware will use at inference time — so this is the correct trade-off.
+  # Custom class map:
+  python prepare_hifda.py --hifda-dir C:/path/to/HIFDA --class-map custom.json ...
 
-HIFDA directory structure expected (from Zenodo):
-  <hifda-dir>/
-    air_conditioner/   measurement_001.csv  ...
-    coffee_maker/      ...
-    hair_dryer/        ...
-    ...
+Outputs (--out-dir data/hifda):
+  X_hifda.npy, y_hifda.npy, hifda_class_map.json
+  hifda_preprocess_report.json, hifda_preprocess_report.md
 
-Each CSV has at least a 'current' column (or 'i', 'I', 'current_A') at 100 kHz.
-Optionally a 'voltage' column — not used here (Fryze is recomputed from synthetic ref
-during training or from real ZMPT101B on-device).
+Outputs (--merge, --out-dir data):
+  X_combined.npy, y_combined.npy
+  combined_preprocess_report.json, combined_preprocess_report.md
 
-Class mapping (HIFDA name → model index):
-  Included (8 of 14 HIFDA classes overlap with the 15-class model vocabulary):
-    air_conditioner    → 0  Air Conditioner
-    coffee_maker       → 1  Coffee maker
-    hair_dryer         → 6  Hairdryer
-    heater             → 7  Heater
-    laptop             → 9  Laptop
-    microwave          → 10 Microwave
-    vacuum_cleaner     → 12 Vacuum
-    washing_machine    → 13 Washing Machine
-  Uncertain / flagged:
-    iron               → 5  Hair Iron  (HIFDA 'iron' is a clothes iron, not a styling tool;
-                                        waveform may differ — inspect before using)
-    lamp               → 8  Incandescent Light Bulb  (verify bulb type in HIFDA metadata)
-  Excluded:
-    charger, desktop_computer, griddle, monitor  (no equivalent in model vocabulary)
+HIFDA dataset info (DOI: 10.1038/s41597-025-04859-3):
+  Sampling rate : 100 kHz
+  Grid          : 50 Hz / 230 V (Spain)
+  Window splits : 10.24ms, 163.84ms, 1310.72ms, Full_time
+  Format        : Current/<appliance>/*.txt  (one float per line, no header)
+  DC offset     : ~1.647 constant sensor bias ? removed by subtracting per-window mean
+
+Selected split: 163.84ms_window_dataset
+  Rationale: 16384 samples/file at 100kHz -> resample to 30kHz -> 4915 samples
+  -> 12 non-overlapping 400-sample sub-windows per file (matches PLAID window length).
+  The 10.24ms split (1024 samples -> 307 after resample) is shorter than the
+  required 400-sample window and would need zero-padding, distorting the waveform.
 """
 
 import os
 import sys
-import glob
+import json
+import math
+import time
+import random
 import argparse
 import warnings
-import numpy as np
+import textwrap
+import traceback
 from pathlib import Path
+from datetime import datetime
+from collections import defaultdict
+
+import numpy as np
 
 try:
     from scipy.signal import resample_poly
     from math import gcd
 except ImportError:
-    print("ERROR: scipy is required. Run: pip install scipy")
+    print("ERROR: scipy is required.  pip install scipy")
     sys.exit(1)
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Constants
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
-TARGET_RATE   = 30_000   # Hz — must match PLAID / model expectation
-SOURCE_RATE   = 100_000  # Hz — HIFDA native rate
-WINDOW_SIZE   = 400      # samples at TARGET_RATE
-SKIP_FRACTION = 0.10     # skip first+last 10% of each recording (transient region)
+SOURCE_RATE   = 100_000   # Hz ? HIFDA native sampling rate
+TARGET_RATE   = 30_000    # Hz ? must match PLAID / model expectation
+WINDOW_SIZE   = 400       # samples at TARGET_RATE (matches PLAID X_real shape[1])
+HIFDA_SPLIT   = "163.84ms_window_dataset"
 
-_g = gcd(TARGET_RATE, SOURCE_RATE)
+_g            = gcd(TARGET_RATE, SOURCE_RATE)
 RESAMPLE_UP   = TARGET_RATE  // _g   # 3
 RESAMPLE_DOWN = SOURCE_RATE  // _g   # 10
 
-# Model appliance index (sorted alphabetically — matches training checkpoint order)
-MODEL_CLASSES = [
-    'Air Conditioner',         # 0
-    'Coffee maker',            # 1
-    'Compact Fluorescent Lamp',# 2
-    'Fan',                     # 3
-    'Fridge',                  # 4
-    'Hair Iron',               # 5
-    'Hairdryer',               # 6
-    'Heater',                  # 7
-    'Incandescent Light Bulb', # 8
-    'Laptop',                  # 9
-    'Microwave',               # 10
-    'Soldering Iron',          # 11
-    'Vacuum',                  # 12
-    'Washing Machine',         # 13
-    'Water kettle',            # 14
-]
-CLASS_INDEX = {name: i for i, name in enumerate(MODEL_CLASSES)}
+# After resampling 163.84ms (16384 samples @ 100kHz) -> 4915.2 -> 4915 samples @ 30kHz
+RESAMPLED_LEN = int(16384 * RESAMPLE_UP / RESAMPLE_DOWN)
+WINDOWS_PER_FILE = RESAMPLED_LEN // WINDOW_SIZE   # 12
 
-# HIFDA folder-name → model class name
-# Keys must match the actual subdirectory names inside the HIFDA archive.
-HIFDA_MAPPING = {
-    'air_conditioner':  'Air Conditioner',
-    'coffee_maker':     'Coffee maker',
-    'hair_dryer':       'Hairdryer',
-    'heater':           'Heater',
-    'laptop':           'Laptop',
-    'microwave':        'Microwave',
-    'vacuum_cleaner':   'Vacuum',
-    'washing_machine':  'Washing Machine',
-    # Uncertain mappings — included by default but flagged in output
-    'iron':             'Hair Iron',
-    'lamp':             'Incandescent Light Bulb',
+# -----------------------------------------------------------------------------
+# Label encoder ? PLAID raw class IDs (must match real_label_encoder.npy order)
+# -----------------------------------------------------------------------------
+# These 16 names and their integer indices match the sklearn LabelEncoder
+# serialised in data/real_label_encoder.npy (alphabetically sorted).
+PLAID_CLASSES = [
+    "Air Conditioner",          # 0
+    "Blender",                  # 1  (< 10 samples ? dropped by train script)
+    "Coffee maker",             # 2
+    "Compact Fluorescent Lamp", # 3
+    "Fan",                      # 4
+    "Fridge",                   # 5
+    "Hair Iron",                # 6
+    "Hairdryer",                # 7
+    "Heater",                   # 8
+    "Incandescent Light Bulb",  # 9
+    "Laptop",                   # 10
+    "Microwave",                # 11
+    "Soldering Iron",           # 12
+    "Vacuum",                   # 13
+    "Washing Machine",          # 14
+    "Water kettle",             # 15
+]
+CLASS_INDEX = {name: i for i, name in enumerate(PLAID_CLASSES)}
+
+# HIFDA folder name -> PLAID class name
+# Keys must be lowercase versions of actual HIFDA sub-directory names.
+SAFE_MAPPING = {
+    "air_conditioner": "Air Conditioner",
+    "coffeemaker":     "Coffee maker",
+    "hairdryer":       "Hairdryer",
+    "heater":          "Heater",
+    "laptop":          "Laptop",
+    "microwave":       "Microwave",
+    "vacuum":          "Vacuum",
+    "washing_machine": "Washing Machine",
 }
 
-UNCERTAIN_CLASSES = {'iron', 'lamp'}
+UNCERTAIN_MAPPING = {
+    # HIFDA 'Iron' is a clothes iron; PLAID 'Hair Iron' is a styling tool.
+    # Current waveforms may differ significantly ? verify before including.
+    "iron":  "Hair Iron",
+    # HIFDA 'Light' type unknown (could be CFL, LED, or ILB).
+    # Only include if README or metadata confirms it is an incandescent bulb.
+    "light": "Incandescent Light Bulb",
+}
 
-EXCLUDED_CLASSES = {'charger', 'desktop_computer', 'griddle', 'monitor'}
-
-# Common column name variants across HIFDA CSV files
-CURRENT_COL_VARIANTS = ['current', 'i', 'I', 'current_a', 'current_A', 'I_A', 'i_a']
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def find_current_column(df) -> str:
-    for name in CURRENT_COL_VARIANTS:
-        if name in df.columns:
-            return name
-    cols = list(df.columns)
-    raise ValueError(
-        f"Cannot find current column. Available columns: {cols}. "
-        "Edit CURRENT_COL_VARIANTS in this script to add your column name."
-    )
+EXCLUDED_FOLDERS = {
+    "charger", "computer", "emptygrid", "griddle", "monitor"
+}
 
 
-def load_csv_current(path: str) -> np.ndarray:
-    """Load a HIFDA CSV and return the raw current signal as float32."""
-    import pandas as pd
-    df = pd.read_csv(path)
-    col = find_current_column(df)
-    return df[col].to_numpy(dtype=np.float32)
+# -----------------------------------------------------------------------------
+# Signal processing helpers
+# -----------------------------------------------------------------------------
+
+def load_txt_signal(path: str) -> np.ndarray | None:
+    """Load a single-column HIFDA .txt file -> 1-D float32 array, or None on error."""
+    try:
+        data = np.loadtxt(path, dtype=np.float64)
+        if data.ndim != 1:
+            data = data.ravel()
+        if len(data) == 0:
+            return None
+        return data.astype(np.float32)
+    except Exception:
+        return None
+
+
+def remove_dc(signal: np.ndarray) -> np.ndarray:
+    """Subtract per-window mean (removes ~1.647 ADC bias present in all HIFDA files)."""
+    return signal - signal.mean()
 
 
 def resample_signal(signal: np.ndarray) -> np.ndarray:
-    """Resample from SOURCE_RATE to TARGET_RATE using polyphase filter."""
-    return resample_poly(signal, RESAMPLE_UP, RESAMPLE_DOWN).astype(np.float32)
+    """Polyphase resample from SOURCE_RATE (100kHz) to TARGET_RATE (30kHz)."""
+    resampled = resample_poly(signal.astype(np.float64), RESAMPLE_UP, RESAMPLE_DOWN)
+    return resampled.astype(np.float32)
 
 
-def normalize_signal(signal: np.ndarray) -> np.ndarray:
-    """Unit-magnitude normalization — same as PLAID preprocessing."""
-    peak = np.max(np.abs(signal))
-    if peak < 1e-9:
-        return signal
-    return signal / peak
-
-
-def extract_windows(signal: np.ndarray, window_size: int = WINDOW_SIZE,
-                    skip_fraction: float = SKIP_FRACTION) -> np.ndarray:
-    """
-    Extract non-overlapping windows from the steady-state region of a signal.
-    Skips the first and last `skip_fraction` of samples to avoid transients.
-    Returns array of shape (n_windows, window_size) or empty array if signal too short.
-    """
-    n = len(signal)
-    start = int(n * skip_fraction)
-    end   = int(n * (1 - skip_fraction))
-    steady = signal[start:end]
-
-    n_windows = len(steady) // window_size
+def extract_windows(signal: np.ndarray, window_size: int = WINDOW_SIZE) -> np.ndarray:
+    """Extract non-overlapping windows. Returns (n_windows, window_size) or empty."""
+    n_windows = len(signal) // window_size
     if n_windows == 0:
         return np.empty((0, window_size), dtype=np.float32)
+    trimmed = signal[:n_windows * window_size]
+    return trimmed.reshape(n_windows, window_size).copy()
 
-    trimmed = steady[:n_windows * window_size]
-    return trimmed.reshape(n_windows, window_size)
+
+def process_file(path: str) -> tuple[np.ndarray, list[str]]:
+    """
+    Full pipeline for one HIFDA .txt file.
+    Returns (windows array shape (n,400), list of rejection reasons).
+    """
+    reasons = []
+
+    raw = load_txt_signal(path)
+    if raw is None:
+        return np.empty((0, WINDOW_SIZE), dtype=np.float32), ["unreadable"]
+
+    if np.isnan(raw).any() or np.isinf(raw).any():
+        raw = raw[np.isfinite(raw)]
+        if len(raw) < WINDOW_SIZE:
+            return np.empty((0, WINDOW_SIZE), dtype=np.float32), ["nan_inf_too_short"]
+
+    detrended  = remove_dc(raw)
+    resampled  = resample_signal(detrended)
+    windows    = extract_windows(resampled)
+
+    if len(windows) == 0:
+        return np.empty((0, WINDOW_SIZE), dtype=np.float32), ["too_short_after_resample"]
+
+    # Sanity: reject windows that are all zeros (silent channel)
+    valid_mask = np.max(np.abs(windows), axis=1) > 1e-9
+    windows    = windows[valid_mask]
+    n_rejected_zero = (~valid_mask).sum()
+    if n_rejected_zero > 0:
+        reasons.append(f"zero_windows:{n_rejected_zero}")
+
+    if len(windows) == 0:
+        return np.empty((0, WINDOW_SIZE), dtype=np.float32), reasons + ["all_zero"]
+
+    return windows, reasons
 
 
-def process_appliance_dir(appl_dir: str, model_class: str, uncertain: bool,
-                          verbose: bool = True) -> tuple[np.ndarray, np.ndarray]:
-    """Process all CSVs in one HIFDA appliance directory."""
-    csv_files = sorted(glob.glob(os.path.join(appl_dir, '**', '*.csv'), recursive=True))
-    if not csv_files:
-        csv_files = sorted(glob.glob(os.path.join(appl_dir, '*.csv')))
+# -----------------------------------------------------------------------------
+# Directory helpers
+# -----------------------------------------------------------------------------
 
-    if not csv_files:
-        warnings.warn(f"No CSV files found in {appl_dir}")
-        return np.empty((0, WINDOW_SIZE), dtype=np.float32), np.empty(0, dtype=np.int64)
+def discover_hifda_root(hifda_dir: str) -> Path:
+    """
+    HIFDA archives may be nested (e.g. archive/HIFDA_HF.../HIFDA_HF.../163.84ms...).
+    Walk up to 2 levels to find the directory that contains the expected split folder.
+    """
+    root = Path(hifda_dir)
+    if (root / HIFDA_SPLIT).exists():
+        return root
+    for child in root.iterdir():
+        if child.is_dir() and (child / HIFDA_SPLIT).exists():
+            return child
+        for grandchild in child.iterdir() if child.is_dir() else []:
+            if grandchild.is_dir() and (grandchild / HIFDA_SPLIT).exists():
+                return grandchild
+    return root  # fall through ? caller will handle missing split
 
-    class_idx = CLASS_INDEX[model_class]
-    all_windows = []
-    skipped = 0
 
-    for csv_path in csv_files:
-        try:
-            raw = load_csv_current(csv_path)
-        except Exception as e:
-            warnings.warn(f"Skipping {csv_path}: {e}")
-            skipped += 1
+def build_class_map(hifda_current_dir: Path,
+                    include_uncertain: bool,
+                    custom_map: dict | None) -> dict[str, dict]:
+    """
+    Return {hifda_folder_name: {model_class, label_id, uncertain, excluded}} for
+    every sub-directory found under hifda_current_dir.
+    """
+    mapping = {}
+    effective_safe      = SAFE_MAPPING.copy()
+    effective_uncertain = UNCERTAIN_MAPPING.copy()
+
+    if custom_map:
+        for k, v in custom_map.items():
+            kl = k.lower()
+            if v is None:
+                effective_safe.pop(kl, None)
+                effective_uncertain.pop(kl, None)
+                EXCLUDED_FOLDERS.add(kl)
+            elif v in CLASS_INDEX:
+                effective_safe[kl]      = v
+                effective_uncertain.pop(kl, None)
+            else:
+                warnings.warn(f"Custom map: '{v}' is not a known PLAID class ? ignoring {k}")
+
+    for folder in sorted(hifda_current_dir.iterdir()):
+        if not folder.is_dir():
             continue
+        fname = folder.name
+        fl    = fname.lower()
+        if fl in EXCLUDED_FOLDERS:
+            mapping[fname] = {"status": "excluded", "reason": "no_model_equivalent"}
+            continue
+        if fl in effective_safe:
+            model_class = effective_safe[fl]
+            mapping[fname] = {
+                "status":      "included",
+                "model_class": model_class,
+                "label_id":    CLASS_INDEX[model_class],
+                "uncertain":   False,
+            }
+        elif fl in effective_uncertain:
+            model_class = effective_uncertain[fl]
+            mapping[fname] = {
+                "status":      "uncertain",
+                "model_class": model_class,
+                "label_id":    CLASS_INDEX[model_class],
+                "uncertain":   True,
+                "included":    include_uncertain,
+            }
+        else:
+            mapping[fname] = {"status": "unrecognised"}
+    return mapping
 
-        resampled  = resample_signal(raw)
-        normalized = normalize_signal(resampled)
-        windows    = extract_windows(normalized)
 
+# -----------------------------------------------------------------------------
+# Per-class processing
+# -----------------------------------------------------------------------------
+
+def process_class(folder: Path, label_id: int, model_class: str,
+                  max_files: int | None, max_windows_per_class: int | None,
+                  seed: int, verbose: bool) -> tuple[np.ndarray, np.ndarray, dict]:
+    """Process all .txt files in one HIFDA appliance folder."""
+    txt_files = sorted(folder.glob("*.txt"))
+    if not txt_files:
+        txt_files = sorted(folder.rglob("*.txt"))
+
+    if not txt_files:
+        return (np.empty((0, WINDOW_SIZE), dtype=np.float32),
+                np.empty(0, dtype=np.int64),
+                {"files_found": 0, "files_accepted": 0, "files_rejected": 0,
+                 "windows": 0, "reject_reasons": {}})
+
+    if max_files is not None and len(txt_files) > max_files:
+        rng = random.Random(seed)
+        txt_files = rng.sample(txt_files, max_files)
+
+    all_windows   = []
+    accepted      = 0
+    rejected      = 0
+    reject_counts = defaultdict(int)
+
+    for fpath in txt_files:
+        windows, reasons = process_file(str(fpath))
         if len(windows) == 0:
-            skipped += 1
-            continue
-
-        all_windows.append(windows)
+            rejected += 1
+            for r in reasons:
+                reject_counts[r] += 1
+        else:
+            accepted += 1
+            all_windows.append(windows)
 
     if not all_windows:
-        return np.empty((0, WINDOW_SIZE), dtype=np.float32), np.empty(0, dtype=np.int64)
+        return (np.empty((0, WINDOW_SIZE), dtype=np.float32),
+                np.empty(0, dtype=np.int64),
+                {"files_found": len(txt_files), "files_accepted": 0,
+                 "files_rejected": rejected, "windows": 0,
+                 "reject_reasons": dict(reject_counts)})
 
-    X = np.concatenate(all_windows, axis=0).astype(np.float32)
-    y = np.full(len(X), class_idx, dtype=np.int64)
+    X = np.concatenate(all_windows, axis=0)
 
-    flag = " [UNCERTAIN MAPPING — verify before training]" if uncertain else ""
+    # Cap windows per class
+    if max_windows_per_class is not None and len(X) > max_windows_per_class:
+        rng = np.random.default_rng(seed)
+        idx = rng.choice(len(X), size=max_windows_per_class, replace=False)
+        X   = X[idx]
+
+    y = np.full(len(X), label_id, dtype=np.int64)
+
+    stats = {
+        "files_found":    len(txt_files),
+        "files_accepted": accepted,
+        "files_rejected": rejected,
+        "windows":        len(X),
+        "reject_reasons": dict(reject_counts),
+    }
+
     if verbose:
-        print(f"  {model_class:<28} {len(X):>5} windows from {len(csv_files)} files"
-              f"  (skipped {skipped}){flag}")
+        uncertain_tag = " [UNCERTAIN]" if model_class in {
+            v for v in UNCERTAIN_MAPPING.values()} else ""
+        print(f"    {model_class:<28} label={label_id:2d}  "
+              f"files={accepted}/{len(txt_files)}  windows={len(X)}{uncertain_tag}")
 
-    return X, y
+    return X, y, stats
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Validation
+# -----------------------------------------------------------------------------
+
+def validate_arrays(X: np.ndarray, y: np.ndarray,
+                    X_ref: np.ndarray, y_ref: np.ndarray,
+                    label: str = "HIFDA") -> list[str]:
+    """Run all validation checks. Returns list of FAILED check descriptions."""
+    failures = []
+
+    if X.dtype != X_ref.dtype:
+        failures.append(f"{label} X dtype {X.dtype} != reference {X_ref.dtype}")
+    if X.shape[1:] != X_ref.shape[1:]:
+        failures.append(f"{label} X shape[1:] {X.shape[1:]} != reference {X_ref.shape[1:]}")
+    if y.shape[1:] != y_ref.shape[1:]:
+        failures.append(f"{label} y shape[1:] {y.shape[1:]} != reference {y_ref.shape[1:]}")
+    if y.dtype != y_ref.dtype:
+        failures.append(f"{label} y dtype {y.dtype} != reference {y_ref.dtype}")
+    if np.isnan(X).any():
+        failures.append(f"{label} X contains NaNs")
+    if np.isinf(X).any():
+        failures.append(f"{label} X contains Infs")
+    if len(X) == 0:
+        failures.append(f"{label} X is empty")
+    if len(X) != len(y):
+        failures.append(f"{label} len(X)={len(X)} != len(y)={len(y)}")
+
+    # Check every label exists in PLAID class space
+    bad_labels = set(np.unique(y)) - set(range(len(PLAID_CLASSES)))
+    if bad_labels:
+        failures.append(f"{label} y has out-of-range labels: {bad_labels}")
+
+    # Check no empty classes
+    unique, counts = np.unique(y, return_counts=True)
+    for uid, cnt in zip(unique, counts):
+        if cnt == 0:
+            failures.append(f"{label} class {uid} is empty")
+
+    return failures
+
+
+def signal_stats(X: np.ndarray) -> dict:
+    per_rms = np.sqrt(np.mean(X**2, axis=1))
+    return {
+        "n_windows":   int(len(X)),
+        "global_min":  float(np.nanmin(X)),
+        "global_max":  float(np.nanmax(X)),
+        "global_mean": float(np.nanmean(X)),
+        "global_std":  float(np.nanstd(X)),
+        "rms_mean":    float(per_rms.mean()),
+        "rms_std":     float(per_rms.std()),
+        "rms_min":     float(per_rms.min()),
+        "rms_max":     float(per_rms.max()),
+        "rms_p25":     float(np.percentile(per_rms, 25)),
+        "rms_p75":     float(np.percentile(per_rms, 75)),
+    }
+
+
+# -----------------------------------------------------------------------------
+# Report generation
+# -----------------------------------------------------------------------------
+
+def class_counts(y: np.ndarray, plaid_classes: list[str]) -> dict:
+    counts = {}
+    unique, c = np.unique(y, return_counts=True)
+    for uid, cnt in zip(unique, c):
+        name = plaid_classes[uid] if uid < len(plaid_classes) else f"unknown_{uid}"
+        counts[name] = int(cnt)
+    return counts
+
+
+def write_md_report(path: Path, report: dict) -> None:
+    lines = [
+        f"# HIFDA Preprocessing Report",
+        f"",
+        f"Generated: {report['generated_at']}",
+        f"",
+        f"## Summary",
+        f"",
+        f"| Item | Value |",
+        f"|---|---|",
+        f"| HIFDA root | `{report['hifda_root']}` |",
+        f"| Split used | `{report['split_used']}` |",
+        f"| Uncertain classes | {'included' if report['uncertain_included'] else 'excluded'} |",
+        f"| Total HIFDA windows | {report['hifda_total_windows']} |",
+        f"| X_hifda shape | {report['X_hifda_shape']} |",
+        f"| X_hifda dtype | {report['X_hifda_dtype']} |",
+        f"| y_hifda shape | {report['y_hifda_shape']} |",
+        f"| **SAFE_TO_TRAIN** | **{'[OK] YES' if report['safe_to_train'] else 'FAIL NO'}** |",
+        f"",
+        f"## Class Mapping",
+        f"",
+        f"| HIFDA Folder | Model Class | Label ID | Status |",
+        f"|---|---|---|---|",
+    ]
+    for folder, info in report["class_map"].items():
+        status = info.get("status", "?")
+        mc     = info.get("model_class", "?")
+        lid    = info.get("label_id", "?")
+        lines.append(f"| {folder} | {mc} | {lid} | {status} |")
+
+    lines += [
+        f"",
+        f"## Per-Class Statistics",
+        f"",
+        f"| Class | PLAID Count | HIFDA Count | Combined |",
+        f"|---|---|---|---|",
+    ]
+    plaid_counts    = report.get("plaid_class_counts", {})
+    hifda_counts    = report.get("hifda_class_counts", {})
+    combined_counts = report.get("combined_class_counts", {})
+    all_classes     = sorted(set(list(plaid_counts) + list(hifda_counts)))
+    for cls in all_classes:
+        pc = plaid_counts.get(cls, 0)
+        hc = hifda_counts.get(cls, 0)
+        cc = combined_counts.get(cls, pc + hc)
+        lines.append(f"| {cls} | {pc} | {hc} | {cc} |")
+
+    lines += [
+        f"",
+        f"## Signal Statistics",
+        f"",
+        f"| Metric | PLAID | HIFDA |",
+        f"|---|---|---|",
+    ]
+    ps = report.get("plaid_signal_stats", {})
+    hs = report.get("hifda_signal_stats", {})
+    for k in ["global_min", "global_max", "global_mean", "global_std",
+              "rms_mean", "rms_std", "rms_min", "rms_max"]:
+        pv = f"{ps.get(k, 'N/A'):.4f}" if isinstance(ps.get(k), float) else str(ps.get(k, "N/A"))
+        hv = f"{hs.get(k, 'N/A'):.4f}" if isinstance(hs.get(k), float) else str(hs.get(k, "N/A"))
+        lines.append(f"| {k} | {pv} | {hv} |")
+
+    if report.get("validation_failures"):
+        lines += [f"", f"## FAIL Validation Failures", f""]
+        for fail in report["validation_failures"]:
+            lines.append(f"- {fail}")
+    else:
+        lines += [f"", f"## [OK] All Validation Checks Passed", f""]
+
+    lines += [
+        f"",
+        f"## Preprocessing Steps Applied",
+        f"",
+        f"1. Load HIFDA Current .txt file (one float per line, no header)",
+        f"2. Remove DC offset: subtract per-window mean (~1.647 ADC bias)",
+        f"3. Resample: 100 kHz -> 30 kHz via polyphase filter (up={RESAMPLE_UP}, down={RESAMPLE_DOWN})",
+        f"4. Extract {WINDOWS_PER_FILE} non-overlapping 400-sample sub-windows per file",
+        f"5. Reject all-zero windows (silent channel artefacts)",
+        f"6. Cast to float32",
+        f"",
+        f"## Reproduction Commands",
+        f"",
+        f"```bash",
+    ]
+    for cmd in report.get("reproduction_commands", []):
+        lines.append(cmd)
+    lines += ["```", ""]
+
+    if report.get("recommended_train_command"):
+        lines += [
+            f"## Recommended Training Command",
+            f"",
+            f"```bash",
+            report["recommended_train_command"],
+            f"```",
+            f"",
+        ]
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+# -----------------------------------------------------------------------------
+# CLI
+# -----------------------------------------------------------------------------
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Preprocess HIFDA dataset for Fusion-ResNet NILM training",
+        description="Preprocess HIFDA dataset for Fusion-ResNet NILM",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent("""\
+            Examples:
+              Dry-run:
+                python prepare_hifda.py --hifda-dir /path/to/HIFDA --dry-run
+
+              Generate HIFDA arrays (exclude uncertain):
+                python prepare_hifda.py --hifda-dir /path/to/HIFDA \\
+                    --out-dir data/hifda --reference-data-dir data --exclude-uncertain
+
+              Merge with PLAID:
+                python prepare_hifda.py --hifda-dir /path/to/HIFDA \\
+                    --out-dir data --reference-data-dir data --merge --exclude-uncertain
+        """),
     )
-    p.add_argument('--hifda-dir',  required=True,
-                   help='Root directory of the downloaded HIFDA dataset')
-    p.add_argument('--out-dir',    default='data',
-                   help='Output directory for .npy files (default: data/)')
-    p.add_argument('--data-dir',   default='data',
-                   help='Directory containing existing X_real.npy / y_real.npy for merging')
-    p.add_argument('--merge',      action='store_true',
-                   help='Merge HIFDA output with existing PLAID data into X_combined.npy')
-    p.add_argument('--exclude-uncertain', action='store_true',
-                   help='Exclude iron and lamp (uncertain class mappings) from output')
-    p.add_argument('--window-size', type=int, default=WINDOW_SIZE,
-                   help=f'Window length in samples at {TARGET_RATE} Hz (default: {WINDOW_SIZE})')
-    p.add_argument('--skip-fraction', type=float, default=SKIP_FRACTION,
-                   help=f'Fraction of each recording to skip at start/end (default: {SKIP_FRACTION})')
-    p.add_argument('--dry-run',    action='store_true',
-                   help='Scan files and report counts without saving anything')
+    p.add_argument("--hifda-dir",           required=True,
+                   help="Root of downloaded HIFDA dataset")
+    p.add_argument("--out-dir",             default="data/hifda",
+                   help="Output directory (default: data/hifda)")
+    p.add_argument("--reference-data-dir",  default="data",
+                   help="Directory with existing PLAID X_real.npy / y_real.npy (default: data)")
+
+    unc = p.add_mutually_exclusive_group()
+    unc.add_argument("--include-uncertain", dest="include_uncertain",
+                     action="store_true",  default=False,
+                     help="Include iron->Hair Iron and light->ILB mappings (off by default)")
+    unc.add_argument("--exclude-uncertain", dest="include_uncertain",
+                     action="store_false",
+                     help="Exclude uncertain mappings (default ? safe)")
+
+    p.add_argument("--class-map",           default=None,
+                   help="Path to JSON file overriding class mapping "
+                        '(e.g. {"iron": null} to exclude, or {"iron": "Hair Iron"} to include)')
+    p.add_argument("--merge",               action="store_true",
+                   help="Combine HIFDA with existing PLAID arrays into X_combined / y_combined")
+    p.add_argument("--max-files-per-class", type=int, default=None,
+                   help="Debug: limit source .txt files per class")
+    p.add_argument("--max-hifda-per-class", type=int, default=2000,
+                   help="Cap HIFDA windows per class (default: 2000 to avoid "
+                        "dominating PLAID; set 0 to disable)")
+    p.add_argument("--force",               action="store_true",
+                   help="Overwrite existing output files")
+    p.add_argument("--dry-run",             action="store_true",
+                   help="Inspect and report only ? do not write any files")
+    p.add_argument("--seed",                type=int, default=42,
+                   help="Random seed for reproducibility (default: 42)")
     return p.parse_args()
 
 
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
+
 def main():
-    args = parse_args()
+    args       = parse_args()
+    start_time = time.time()
 
-    hifda_root = Path(args.hifda_dir)
+    hifda_dir  = discover_hifda_root(args.hifda_dir)
     out_dir    = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    ref_dir    = Path(args.reference_data_dir)
+    max_cap    = args.max_hifda_per_class if args.max_hifda_per_class > 0 else None
 
-    if not hifda_root.exists():
-        print(f"ERROR: HIFDA directory not found: {hifda_root}")
+    print(f"\n{'='*70}")
+    print(f"  HIFDA Preprocessing Pipeline")
+    print(f"{'='*70}")
+    print(f"  HIFDA root     : {hifda_dir}")
+    print(f"  Split          : {HIFDA_SPLIT}")
+    print(f"  Resample       : {SOURCE_RATE} Hz -> {TARGET_RATE} Hz  "
+          f"(poly {RESAMPLE_UP}/{RESAMPLE_DOWN})")
+    print(f"  Window size    : {WINDOW_SIZE} samples  "
+          f"({WINDOW_SIZE/TARGET_RATE*1000:.2f} ms at {TARGET_RATE} Hz)")
+    print(f"  Windows/file   : {WINDOWS_PER_FILE}")
+    print(f"  Cap/class      : {max_cap if max_cap else 'disabled'}")
+    print(f"  Uncertain      : {'included' if args.include_uncertain else 'excluded (default)'}")
+    print(f"  Dry run        : {'YES ? no files will be written' if args.dry_run else 'no'}")
+    print()
+
+    # -- 1. Locate split ------------------------------------------------------
+    split_dir   = hifda_dir / HIFDA_SPLIT
+    current_dir = split_dir / "Current"
+    if not current_dir.exists():
+        print(f"ERROR: Expected directory not found: {current_dir}")
+        print(f"  Available under {hifda_dir}:")
+        for item in sorted(hifda_dir.iterdir()):
+            print(f"    {item.name}")
         sys.exit(1)
 
-    print(f"\nHIFDA preprocessing")
-    print(f"  Source dir  : {hifda_root}")
-    print(f"  Output dir  : {out_dir}")
-    print(f"  Resample    : {SOURCE_RATE} Hz → {TARGET_RATE} Hz  "
-          f"(poly {RESAMPLE_UP}/{RESAMPLE_DOWN})")
-    print(f"  Window size : {args.window_size} samples")
-    print(f"  Skip frac   : {args.skip_fraction:.0%} at each end\n")
+    # -- 2. Load reference PLAID data -----------------------------------------
+    plaid_x_path = ref_dir / "X_real.npy"
+    plaid_y_path = ref_dir / "y_real.npy"
+    X_plaid, y_plaid = None, None
 
-    # Scan available subdirectories
-    available = {d.name.lower(): d for d in hifda_root.iterdir() if d.is_dir()}
-
-    print("Appliance directories found:")
-    for name in sorted(available):
-        tag = ''
-        if name in HIFDA_MAPPING:
-            tag = f"→ {HIFDA_MAPPING[name]}"
-            if name in UNCERTAIN_CLASSES:
-                tag += " [UNCERTAIN]"
-        elif name in EXCLUDED_CLASSES:
-            tag = "EXCLUDED"
-        else:
-            tag = "UNRECOGNISED — will be skipped"
-        print(f"  {name:<30} {tag}")
+    if plaid_x_path.exists() and plaid_y_path.exists():
+        print(f"[Reference] Loading PLAID arrays from {ref_dir} ...")
+        X_plaid = np.load(plaid_x_path, allow_pickle=True)
+        y_plaid = np.load(plaid_y_path, allow_pickle=True)
+        plaid_counts = class_counts(y_plaid, PLAID_CLASSES)
+        print(f"  X_plaid : {X_plaid.shape}  dtype={X_plaid.dtype}")
+        print(f"  y_plaid : {y_plaid.shape}  dtype={y_plaid.dtype}")
+        print(f"  Classes : {len(np.unique(y_plaid))} unique raw IDs")
+    else:
+        print(f"WARNING: PLAID reference arrays not found at {ref_dir}. "
+              f"Validation against PLAID schema will be skipped.")
+        plaid_counts = {}
+        X_plaid = np.empty((0, WINDOW_SIZE), dtype=np.float32)
+        y_plaid = np.empty(0, dtype=np.int64)
 
     print()
 
-    all_X, all_y = [], []
+    # -- 3. Load custom class map ----------------------------------------------
+    custom_map = None
+    if args.class_map:
+        with open(args.class_map) as f:
+            custom_map = json.load(f)
+        print(f"[Custom map] loaded from {args.class_map}")
 
-    for folder_name, folder_path in sorted(available.items()):
-        if folder_name in EXCLUDED_CLASSES:
-            print(f"  Skipping excluded class: {folder_name}")
-            continue
-
-        if folder_name not in HIFDA_MAPPING:
-            print(f"  Skipping unrecognised class: {folder_name}")
-            continue
-
-        uncertain = folder_name in UNCERTAIN_CLASSES
-        if uncertain and args.exclude_uncertain:
-            print(f"  Skipping uncertain class: {folder_name}")
-            continue
-
-        model_class = HIFDA_MAPPING[folder_name]
-
-        if args.dry_run:
-            csvs = list(folder_path.rglob('*.csv'))
-            print(f"  {model_class:<28} {len(csvs)} CSV files (dry run)")
-            continue
-
-        X, y = process_appliance_dir(
-            str(folder_path), model_class, uncertain=uncertain
-        )
-        if len(X) > 0:
-            all_X.append(X)
-            all_y.append(y)
+    # -- 4. Build class mapping ------------------------------------------------
+    class_map = build_class_map(current_dir, args.include_uncertain, custom_map)
+    print("[Class mapping]")
+    for folder, info in class_map.items():
+        status = info["status"]
+        if status == "included":
+            print(f"  [OK] {folder:<22} -> {info['model_class']} (label {info['label_id']})")
+        elif status == "uncertain":
+            act = "[OK] INCLUDED [UNCERTAIN]" if info["included"] else "[WARN]  EXCLUDED [UNCERTAIN]"
+            print(f"  {act}  {folder:<22} -> {info['model_class']} (label {info['label_id']})")
+        elif status == "excluded":
+            print(f"  - {folder:<22} excluded ({info.get('reason', '')})")
+        else:
+            print(f"  ? {folder:<22} unrecognised ? skipped")
+    print()
 
     if args.dry_run:
-        print("\nDry run complete — no files written.")
+        print("[Dry-run] Scanning file counts per class ...")
+        total_files = 0
+        for folder, info in class_map.items():
+            if info["status"] not in ("included",) and not (
+                    info["status"] == "uncertain" and info.get("included")):
+                continue
+            d = current_dir / folder
+            n = len(list(d.glob("*.txt")))
+            est_windows = n * WINDOWS_PER_FILE
+            capped = min(est_windows, max_cap) if max_cap else est_windows
+            total_files += n
+            print(f"  {info['model_class']:<28} {n} files "
+                  f"-> est. {est_windows} windows -> capped to {capped}")
+        print(f"\n  Total source files : {total_files}")
+        print(f"\n[Dry-run complete] No files written.")
         return
 
+    # -- 5. Process each active class -----------------------------------------
+    print("[Processing HIFDA classes]")
+    all_X, all_y = [], []
+    per_class_stats = {}
+    class_map_out   = {}
+
+    for folder, info in class_map.items():
+        is_active = (info["status"] == "included") or (
+            info["status"] == "uncertain" and info.get("included"))
+
+        class_map_out[folder] = info
+
+        if not is_active:
+            continue
+
+        folder_path = current_dir / folder
+        if not folder_path.exists():
+            print(f"  WARNING: folder not found: {folder_path}")
+            continue
+
+        X_cls, y_cls, stats = process_class(
+            folder         = folder_path,
+            label_id       = info["label_id"],
+            model_class    = info["model_class"],
+            max_files      = args.max_files_per_class,
+            max_windows_per_class = max_cap,
+            seed           = args.seed,
+            verbose        = True,
+        )
+
+        per_class_stats[folder] = stats
+        if len(X_cls) > 0:
+            all_X.append(X_cls)
+            all_y.append(y_cls)
+
     if not all_X:
-        print("ERROR: No windows extracted. Check --hifda-dir and CSV column names.")
+        print("\nERROR: No windows extracted. "
+              "Check --hifda-dir and ensure .txt files exist.")
         sys.exit(1)
 
-    X_hifda = np.concatenate(all_X, axis=0)
-    y_hifda = np.concatenate(all_y, axis=0)
+    X_hifda = np.concatenate(all_X, axis=0).astype(np.float32)
+    y_hifda = np.concatenate(all_y, axis=0).astype(np.int64)
 
-    print(f"\nHIFDA dataset summary:")
-    print(f"  Total windows : {len(X_hifda)}")
-    print(f"  Shape         : {X_hifda.shape}")
-    unique, counts = np.unique(y_hifda, return_counts=True)
-    for idx, cnt in zip(unique, counts):
-        print(f"    {MODEL_CLASSES[idx]:<28} {cnt:>5} windows")
+    # Shuffle
+    rng  = np.random.default_rng(args.seed)
+    perm = rng.permutation(len(X_hifda))
+    X_hifda, y_hifda = X_hifda[perm], y_hifda[perm]
 
-    # Save HIFDA-only arrays
-    x_path = out_dir / 'X_hifda.npy'
-    y_path = out_dir / 'y_hifda.npy'
-    np.save(x_path, X_hifda)
-    np.save(y_path, y_hifda)
-    print(f"\nSaved: {x_path}  ({X_hifda.nbytes / 1e6:.1f} MB)")
-    print(f"Saved: {y_path}")
+    print(f"\n[HIFDA summary]  {len(X_hifda)} windows  shape={X_hifda.shape}  "
+          f"dtype={X_hifda.dtype}")
+    hifda_counts = class_counts(y_hifda, PLAID_CLASSES)
+    for cls, cnt in sorted(hifda_counts.items()):
+        pc = plaid_counts.get(cls, 0)
+        print(f"  {cls:<28} HIFDA={cnt:5d}  PLAID={pc:5d}  combined={cnt+pc}")
 
-    # Optionally merge with PLAID data
+    # -- 6. Validate -----------------------------------------------------------
+    print("\n[Validation]")
+    failures = validate_arrays(X_hifda, y_hifda, X_plaid, y_plaid, label="HIFDA")
+    if failures:
+        print("  FAIL VALIDATION FAILED:")
+        for f in failures:
+            print(f"    - {f}")
+    else:
+        print("  [OK] All validation checks passed")
+
+    # -- 7. Save HIFDA-only arrays ---------------------------------------------
+    if not args.dry_run:
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        x_out = out_dir / "X_hifda.npy"
+        y_out = out_dir / "y_hifda.npy"
+
+        if x_out.exists() and not args.force:
+            print(f"\nWARNING: {x_out} already exists. Use --force to overwrite.")
+        else:
+            np.save(x_out, X_hifda)
+            np.save(y_out, y_hifda)
+            print(f"\n  Saved: {x_out}  ({X_hifda.nbytes/1e6:.1f} MB)")
+            print(f"  Saved: {y_out}")
+
+        # -- 8. Class map JSON -------------------------------------------------
+        cm_out = out_dir / "hifda_class_map.json"
+        with open(cm_out, "w") as f:
+            json.dump(class_map_out, f, indent=2)
+        print(f"  Saved: {cm_out}")
+
+    # -- 9. Merge with PLAID ---------------------------------------------------
+    combined_counts = {}
+    X_combined, y_combined = None, None
+
     if args.merge:
-        plaid_x = Path(args.data_dir) / 'X_real.npy'
-        plaid_y = Path(args.data_dir) / 'y_real.npy'
-
-        if not plaid_x.exists() or not plaid_y.exists():
-            print(f"\nWARNING: --merge requested but PLAID data not found at {args.data_dir}/. "
+        if len(X_plaid) == 0:
+            print("\nWARNING: --merge requested but PLAID arrays are empty/missing. "
                   "Skipping merge.")
         else:
-            X_plaid = np.load(plaid_x, allow_pickle=True).astype(np.float32)
-            y_plaid = np.load(plaid_y, allow_pickle=True).astype(np.int64)
+            X_combined = np.concatenate([X_plaid.astype(np.float32),
+                                          X_hifda], axis=0)
+            y_combined = np.concatenate([y_plaid.astype(np.int64),
+                                          y_hifda], axis=0)
 
-            X_combined = np.concatenate([X_plaid, X_hifda], axis=0)
-            y_combined = np.concatenate([y_plaid, y_hifda], axis=0)
+            # Shuffle combined
+            perm2 = np.random.default_rng(args.seed).permutation(len(X_combined))
+            X_combined, y_combined = X_combined[perm2], y_combined[perm2]
 
-            xc_path = out_dir / 'X_combined.npy'
-            yc_path = out_dir / 'y_combined.npy'
-            np.save(xc_path, X_combined)
-            np.save(yc_path, y_combined)
+            combined_counts = class_counts(y_combined, PLAID_CLASSES)
 
-            print(f"\nMerged dataset:")
-            print(f"  PLAID windows : {len(X_plaid)}")
-            print(f"  HIFDA windows : {len(X_hifda)}")
-            print(f"  Combined      : {len(X_combined)}")
-            print(f"  Saved: {xc_path}  ({X_combined.nbytes / 1e6:.1f} MB)")
-            print(f"  Saved: {yc_path}")
+            print(f"\n[Combined dataset]  {len(X_combined)} windows  "
+                  f"(PLAID={len(X_plaid)} + HIFDA={len(X_hifda)})")
 
-            print("\nTo train on combined data (50 Hz/230 V for Ghana deployment):")
-            print("  python train_fusion_resnet.py \\")
-            print(f"    --data-dir {out_dir} \\")
-            print("    --mains-freq 50 --mains-volt 230 \\")
-            print("    --model-version combined-50hz-v1 \\")
-            print("    --epochs 300 --early-stopping-patience 40 [--variant lite] [--device cuda]")
+            merge_failures = validate_arrays(
+                X_combined, y_combined, X_plaid, y_plaid, label="Combined")
+            if merge_failures:
+                print("  FAIL COMBINED VALIDATION FAILED:")
+                for f in merge_failures:
+                    print(f"    - {f}")
+                failures += merge_failures
+            else:
+                print("  [OK] Combined validation passed")
 
-    print("\nTo train on HIFDA only (50 Hz / 230 V):")
-    print("  python train_fusion_resnet.py \\")
-    print(f"    --data-dir {out_dir} \\")
-    print("    --mains-freq 50 --mains-volt 230 \\")
-    print("    --model-version hifda-v1 \\")
-    print("    --epochs 300 --early-stopping-patience 40 [--variant lite] [--device cuda]")
+            if not args.dry_run:
+                merge_out_dir = Path(args.out_dir)
+                merge_out_dir.mkdir(parents=True, exist_ok=True)
+
+                xc = merge_out_dir / "X_combined.npy"
+                yc = merge_out_dir / "y_combined.npy"
+
+                if xc.exists() and not args.force:
+                    print(f"\n  WARNING: {xc} exists. Use --force to overwrite.")
+                else:
+                    np.save(xc, X_combined)
+                    np.save(yc, y_combined)
+                    print(f"  Saved: {xc}  ({X_combined.nbytes/1e6:.1f} MB)")
+                    print(f"  Saved: {yc}")
+
+    # -- 10. Reports -----------------------------------------------------------
+    safe_to_train = len(failures) == 0
+    elapsed       = time.time() - start_time
+
+    repro_cmds = [
+        f"# HIFDA only (exclude uncertain):",
+        f"python prepare_hifda.py --hifda-dir \"{args.hifda_dir}\" "
+        f"--out-dir \"{args.out_dir}\" "
+        f"--reference-data-dir \"{args.reference_data_dir}\" "
+        f"{'--include-uncertain' if args.include_uncertain else '--exclude-uncertain'} "
+        f"--seed {args.seed}",
+    ]
+    if args.merge:
+        repro_cmds += [
+            "",
+            "# Merge with PLAID:",
+            f"python prepare_hifda.py --hifda-dir \"{args.hifda_dir}\" "
+            f"--out-dir \"{args.out_dir}\" "
+            f"--reference-data-dir \"{args.reference_data_dir}\" "
+            f"--merge "
+            f"{'--include-uncertain' if args.include_uncertain else '--exclude-uncertain'} "
+            f"--seed {args.seed}",
+        ]
+
+    train_cmd = (
+        "python train_fusion_resnet.py \\\n"
+        "  --data-dir data \\\n"
+        "  --mains-freq 50 --mains-volt 230 \\\n"
+        "  --model-version combined-50hz-v1 \\\n"
+        "  --epochs 300 --early-stopping-patience 40 \\\n"
+        "  --variant lite --device cuda"
+        if safe_to_train else None
+    )
+
+    report = {
+        "generated_at":          datetime.now().isoformat(),
+        "elapsed_seconds":       round(elapsed, 1),
+        "hifda_root":            str(hifda_dir),
+        "split_used":            HIFDA_SPLIT,
+        "source_rate_hz":        SOURCE_RATE,
+        "target_rate_hz":        TARGET_RATE,
+        "window_size":           WINDOW_SIZE,
+        "windows_per_file":      WINDOWS_PER_FILE,
+        "max_hifda_per_class":   max_cap,
+        "uncertain_included":    args.include_uncertain,
+        "class_map":             class_map_out,
+        "per_class_stats":       per_class_stats,
+        "X_hifda_shape":         list(X_hifda.shape),
+        "X_hifda_dtype":         str(X_hifda.dtype),
+        "y_hifda_shape":         list(y_hifda.shape),
+        "y_hifda_dtype":         str(y_hifda.dtype),
+        "X_plaid_shape":         list(X_plaid.shape) if X_plaid is not None else None,
+        "X_plaid_dtype":         str(X_plaid.dtype)  if X_plaid is not None else None,
+        "hifda_total_windows":   int(len(X_hifda)),
+        "plaid_class_counts":    plaid_counts,
+        "hifda_class_counts":    hifda_counts,
+        "combined_class_counts": combined_counts,
+        "plaid_signal_stats":    signal_stats(X_plaid) if len(X_plaid) > 0 else {},
+        "hifda_signal_stats":    signal_stats(X_hifda),
+        "validation_failures":   failures,
+        "safe_to_train":         safe_to_train,
+        "reproduction_commands": repro_cmds,
+        "recommended_train_command": train_cmd,
+    }
+
+    if X_combined is not None:
+        report["X_combined_shape"] = list(X_combined.shape)
+        report["X_combined_dtype"] = str(X_combined.dtype)
+
+    if not args.dry_run:
+        rj = out_dir / "hifda_preprocess_report.json"
+        rm = out_dir / "hifda_preprocess_report.md"
+        with open(rj, "w") as f:
+            json.dump(report, f, indent=2)
+        write_md_report(rm, report)
+        print(f"\n  Saved: {rj}")
+        print(f"  Saved: {rm}")
+
+        if args.merge and X_combined is not None:
+            merge_dir = Path(args.out_dir)
+            crj = merge_dir / "combined_preprocess_report.json"
+            crm = merge_dir / "combined_preprocess_report.md"
+            with open(crj, "w") as f:
+                json.dump(report, f, indent=2)
+            write_md_report(crm, report)
+            print(f"  Saved: {crj}")
+            print(f"  Saved: {crm}")
+
+    # -- 11. Final status ------------------------------------------------------
+    print(f"\n{'='*70}")
+    if safe_to_train:
+        print(f"  SAFE_TO_TRAIN = true  [OK]")
+        print(f"\n  Next steps:")
+        print(f"  1. Verify dataset:  python verify_dataset.py --data-dir {args.out_dir}")
+        if args.merge:
+            print(f"  2. Copy to data/:   copy data\\X_combined.npy data\\X_real.npy")
+            print(f"                      copy data\\y_combined.npy data\\y_real.npy")
+        print(f"  3. Train (50 Hz / 230 V for Ghana):")
+        print(f"       python train_fusion_resnet.py \\")
+        print(f"         --mains-freq 50 --mains-volt 230 \\")
+        print(f"         --model-version combined-50hz-v1 \\")
+        print(f"         --epochs 300 --early-stopping-patience 40 \\")
+        print(f"         --variant lite --device cuda")
+    else:
+        print(f"  SAFE_TO_TRAIN = false  FAIL")
+        print(f"  Failures:")
+        for f in failures:
+            print(f"    - {f}")
+        print(f"  Fix the above issues before retraining.")
+    print(f"{'='*70}")
+    print(f"  Elapsed: {elapsed:.1f}s")
     print()
-    print("NOTE: Run with --data-dir pointing at X_hifda.npy / y_hifda.npy by renaming")
-    print("      those files to X_real.npy / y_real.npy, or pass --data-dir to a separate")
-    print("      directory containing the HIFDA files under those names.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
