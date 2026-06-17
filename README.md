@@ -149,7 +149,3 @@ Inference writes:
 - Preprocessed inference now rebuilds the model directly from checkpoint metadata and saved ICA buffers.
 - You do **not** need to re-fit ICA just to run inference.
 - Timestamps are emitted in UTC for consistency.
-
-## Docs
-
-- [Hardware_and_Preprocessing_Walkthrough.md](docs/Hardware_and_Preprocessing_Walkthrough.md)

@@ -1,0 +1,35 @@
+{
+  "source": "WHITED",
+  "source_rate_hz": 44100,
+  "target_rate_hz": 30000,
+  "window_size": 400,
+  "skip_seconds": 1.0,
+  "resample_up": 100,
+  "resample_down": 147,
+  "uncertain_included": false,
+  "max_windows_per_class": 2000,
+  "total_files_processed": 409,
+  "total_windows": 26000,
+  "X_shape": [
+    26000,
+    400
+  ],
+  "X_dtype": "float32",
+  "global_mean": 0.000734116998501122,
+  "global_std": 0.23309172689914703,
+  "classes": {
+    "Air Conditioner": 2000,
+    "Coffee maker": 2000,
+    "Compact Fluorescent Lamp": 2000,
+    "Fan": 2000,
+    "Fridge": 2000,
+    "Hairdryer": 2000,
+    "Heater": 2000,
+    "Laptop": 2000,
+    "Microwave": 2000,
+    "Soldering Iron": 2000,
+    "Vacuum": 2000,
+    "Washing Machine": 2000,
+    "Water kettle": 2000
+  }
+}
