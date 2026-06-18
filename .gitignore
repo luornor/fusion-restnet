@@ -11,6 +11,10 @@ model_registry/*.pth
 data/combined/X_combined.npy
 data/combined/y_combined.npy
 
+# Natural recording waveforms — large raw signals (55 MB each), regenerate via:
+#   python preprocessing/prepare_natural.py --mat-dir ../Matlab_Data/Natural/...
+data/natural/*.npy
+
 # C extensions
 *.so
 
