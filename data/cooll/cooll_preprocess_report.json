@@ -1,0 +1,25 @@
+{
+  "source": "COOLL",
+  "source_rate_hz": 100000,
+  "target_rate_hz": 30000,
+  "window_size": 400,
+  "skip_seconds": 1.0,
+  "resample_up": 3,
+  "resample_down": 10,
+  "uncertain_included": false,
+  "max_windows_per_class": 2000,
+  "total_files_processed": 210,
+  "total_windows": 6000,
+  "X_shape": [
+    6000,
+    400
+  ],
+  "X_dtype": "float32",
+  "global_mean": -0.0016184891574084759,
+  "global_std": 0.4026274085044861,
+  "classes": {
+    "Fan": 2000,
+    "Hairdryer": 2000,
+    "Vacuum": 2000
+  }
+}

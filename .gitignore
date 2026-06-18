@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 
 # Model checkpoints (large files)
+model_registry/*.pt
+model_registry/*.pth
+
+# Combined dataset arrays — regenerate via: python preprocessing/merge_datasets.py
+data/combined/X_combined.npy
+data/combined/y_combined.npy
 
 # C extensions
 *.so
