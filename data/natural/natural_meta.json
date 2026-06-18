@@ -1,0 +1,311 @@
+{
+  "dataset": "PLAID Natural Recordings",
+  "source_dir": "..\\Matlab_Data\\Natural\\7\\7H2A2B2C2K2F2D2",
+  "n_recordings": 8,
+  "sample_rate_hz": 15384,
+  "mains_freq_hz": 60,
+  "total_duration_s": 7200.239999999999,
+  "note": "Raw current waveforms in Amperes. Inference pipeline handles per-window resampling and normalization. Pass --sample-rate 15384 --mains-freq 60 to inference_pipeline.py.",
+  "recordings": [
+    {
+      "waveform_id": "Waveform70000",
+      "source_file": "Waveform70000.mat",
+      "npy_file": "waveform70000.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846023,
+      "current_rms_A": 3.3833,
+      "current_peak_A": 9.2951,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 144.7342,
+          "sample": 2226591,
+          "type": "ON"
+        },
+        {
+          "time_s": 459.7739,
+          "sample": 7073161,
+          "type": "ON"
+        },
+        {
+          "time_s": 535.1739,
+          "sample": 8233115,
+          "type": "OFF"
+        },
+        {
+          "time_s": 734.9223,
+          "sample": 11306044,
+          "type": "OFF"
+        },
+        {
+          "time_s": 876.2744,
+          "sample": 13480605,
+          "type": "OFF"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70000.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70000"
+    },
+    {
+      "waveform_id": "Waveform70001",
+      "source_file": "Waveform70001.mat",
+      "npy_file": "waveform70001.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846022,
+      "current_rms_A": 1.359,
+      "current_peak_A": 24.1674,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 38.7877,
+          "sample": 596710,
+          "type": "OFF"
+        },
+        {
+          "time_s": 122.9132,
+          "sample": 1890897,
+          "type": "ON"
+        },
+        {
+          "time_s": 191.8249,
+          "sample": 2951034,
+          "type": "ON"
+        },
+        {
+          "time_s": 726.5501,
+          "sample": 11177246,
+          "type": "ON"
+        },
+        {
+          "time_s": 768.295,
+          "sample": 11819450,
+          "type": "OFF"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70001.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70001"
+    },
+    {
+      "waveform_id": "Waveform70002",
+      "source_file": "Waveform70002.mat",
+      "npy_file": "waveform70002.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846021,
+      "current_rms_A": 1.2736,
+      "current_peak_A": 2.7885,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70002.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70002"
+    },
+    {
+      "waveform_id": "Waveform70003",
+      "source_file": "Waveform70003.mat",
+      "npy_file": "waveform70003.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846020,
+      "current_rms_A": 2.4517,
+      "current_peak_A": 17.6725,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 584.7382,
+          "sample": 8995613,
+          "type": "ON"
+        },
+        {
+          "time_s": 610.6468,
+          "sample": 9394190,
+          "type": "OFF"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70003.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70003"
+    },
+    {
+      "waveform_id": "Waveform70004",
+      "source_file": "Waveform70004.mat",
+      "npy_file": "waveform70004.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846020,
+      "current_rms_A": 1.2493,
+      "current_peak_A": 2.3767,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70004.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70004"
+    },
+    {
+      "waveform_id": "Waveform70005",
+      "source_file": "Waveform70005.mat",
+      "npy_file": "waveform70005.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846019,
+      "current_rms_A": 4.7436,
+      "current_peak_A": 24.1674,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 176.9769,
+          "sample": 2722612,
+          "type": "ON"
+        },
+        {
+          "time_s": 226.1396,
+          "sample": 3478931,
+          "type": "OFF"
+        },
+        {
+          "time_s": 249.3559,
+          "sample": 3836091,
+          "type": "ON"
+        },
+        {
+          "time_s": 505.8941,
+          "sample": 7782675,
+          "type": "ON"
+        },
+        {
+          "time_s": 666.3405,
+          "sample": 10250983,
+          "type": "OFF"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70005.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70005"
+    },
+    {
+      "waveform_id": "Waveform70006",
+      "source_file": "Waveform70006.mat",
+      "npy_file": "waveform70006.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846021,
+      "current_rms_A": 2.9754,
+      "current_peak_A": 24.1674,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 67.6134,
+          "sample": 1040165,
+          "type": "ON"
+        },
+        {
+          "time_s": 110.4717,
+          "sample": 1699496,
+          "type": "OFF"
+        },
+        {
+          "time_s": 135.8675,
+          "sample": 2090186,
+          "type": "OFF"
+        },
+        {
+          "time_s": 684.7365,
+          "sample": 10533986,
+          "type": "ON"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70006.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70006"
+    },
+    {
+      "waveform_id": "Waveform70007",
+      "source_file": "Waveform70007.mat",
+      "npy_file": "waveform70007.npy",
+      "sample_rate_hz": 15384,
+      "mains_freq_hz": 60,
+      "duration_s": 900.03,
+      "n_samples": 13846021,
+      "current_rms_A": 2.2287,
+      "current_peak_A": 7.4479,
+      "load_descr_short": "7H2A2B2C2K2F2D2",
+      "appliances": {
+        "raw_description": "Pedestal Fan Aquarium Digital Thermostat Aquarium Light Fish Lamp 1 Aquarium Light Fish Lamp 2 Drill Machine Hot-air Hand Tool Hair Dryer - Fan 2",
+        "matched_training_classes": [
+          "Fan",
+          "Hairdryer",
+          "Heater"
+        ],
+        "note": "Unmatched appliances produce no output from the model (out-of-domain)."
+      },
+      "events": [
+        {
+          "time_s": 125.4244,
+          "sample": 1929529,
+          "type": "OFF"
+        }
+      ],
+      "inference_command": "python inference/inference_pipeline.py --checkpoint model_registry/<checkpoint>.pt --input data/natural/waveform70007.npy --sample-rate 15384 --mains-freq 60 --output inference_results/waveform70007"
+    }
+  ]
+}
