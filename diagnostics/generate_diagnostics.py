@@ -513,8 +513,8 @@ def main():
     # --- 1. Load checkpoint histories ---
     print("\n[1/4] Loading checkpoint histories...")
     ckpt_map = {
-        'v0.0.1-dev (300 ep)': os.path.join(args.checkpoints_dir, 'latest-v0.0.1-dev.pt'),
-        'earlystop-v1': os.path.join(args.checkpoints_dir, 'latest_vearlystop-v1.pt'),
+        'v0.0.1-dev (300 ep)': os.path.join(args.checkpoints_dir, 'v0.0.1-dev_best.pt'),
+        'earlystop-v1': os.path.join(args.checkpoints_dir, 'earlystop-v1_best.pt'),
     }
     runs = {}
     best_ckpt_path = None

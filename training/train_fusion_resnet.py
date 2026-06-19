@@ -5,7 +5,7 @@ Fusion-ResNet Training Script for NILM Energy Disaggregation
 This script trains the Fusion-ResNet model on the PLAID dataset.
 Compatible with both local GPU and Google Colab.
 
-Checkpoints are saved with semantic versioning: latest_v{version}.pt
+Checkpoints are saved with semantic versioning: {version}_best.pt, {version}_last.pt, {version}_ep{n:03d}.pt
 
 Usage:
     # Local (with CUDA GPU) - default 300 epochs
@@ -488,8 +488,8 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
     epochs_without_improvement = 0
     stop_epoch = None
     model_version = checkpoint_meta.get('model_version', '0.0.1-dev') if checkpoint_meta else '0.0.1-dev'
-    best_versioned_path = os.path.join(save_dir, f"latest_v{model_version}.pt")
-    last_versioned_path = os.path.join(save_dir, f"last_v{model_version}.pt")
+    best_ckpt_path = os.path.join(save_dir, f"{model_version}_best.pt")
+    last_ckpt_path = os.path.join(save_dir, f"{model_version}_last.pt")
     base_lr = optimizer.param_groups[0]['lr']
 
     for epoch in range(start_epoch, num_epochs):
@@ -550,17 +550,16 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
             ckpt["best_val_f1"] = best_val
             epochs_without_improvement = 0
             if save_dir:
-                torch.save(ckpt, f"{save_dir}/best.pt")
-                torch.save(ckpt, best_versioned_path)
+                torch.save(ckpt, best_ckpt_path)
         else:
             epochs_without_improvement += 1
 
         if save_dir and save_every > 0 and ((epoch + 1) % save_every == 0):
-            torch.save(ckpt, f"{save_dir}/last.pt")
-            torch.save(ckpt, last_versioned_path)
+            torch.save(ckpt, last_ckpt_path)
 
         if save_dir and snapshot_every > 0 and ((epoch + 1) % snapshot_every == 0):
-            torch.save(ckpt, f"{save_dir}/epoch_{epoch + 1:03d}.pt")
+            snap_path = os.path.join(save_dir, f"{model_version}_ep{epoch + 1:03d}.pt")
+            torch.save(ckpt, snap_path)
 
         if early_stopping_patience > 0 and epochs_without_improvement >= early_stopping_patience:
             stop_epoch = epoch
@@ -582,8 +581,7 @@ def train_model(model, train_loader, val_loader, loss_fn, optimizer, scheduler,
         }
         if checkpoint_meta:
             ckpt.update(checkpoint_meta)
-        torch.save(ckpt, f"{save_dir}/last.pt")
-        torch.save(ckpt, last_versioned_path)
+        torch.save(ckpt, last_ckpt_path)
 
     print(f"\nBest validation F1: {best_val:.4f}")
     return history
@@ -1175,25 +1173,14 @@ def main():
     print(f"\n[6/6] Evaluating and generating plots...")
     threshold = history['threshold'][-1]
 
-    # Load best checkpoint with versioning support
-    versioned_ckpt_path = f"{args.save_dir}/latest_v{args.model_version}.pt"
-    legacy_ckpt_path = f"{args.save_dir}/best.pt"
-    ckpt_path = versioned_ckpt_path if os.path.exists(versioned_ckpt_path) else legacy_ckpt_path
-    if os.path.exists(ckpt_path):
-        ckpt = torch.load(ckpt_path, map_location=args.device, weights_only=True)
+    # Load best checkpoint for evaluation
+    best_ckpt_path = f"{args.save_dir}/{args.model_version}_best.pt"
+    if os.path.exists(best_ckpt_path):
+        ckpt = torch.load(best_ckpt_path, map_location=args.device, weights_only=True)
         model.load_state_dict(ckpt['model_state_dict'])
         threshold = ckpt.get('threshold', threshold)
         print(f"Loaded best checkpoint (epoch {ckpt['epoch']}, "
               f"val F1 = {ckpt.get('best_val_f1', 'N/A'):.4f})")
-        
-        # Save versioned checkpoint if not already saved
-        if ckpt_path == legacy_ckpt_path:  # Only if we loaded from legacy path
-            torch.save(ckpt, versioned_ckpt_path)
-            print(f"  Saved versioned checkpoint: {versioned_ckpt_path}")
-    elif os.path.exists(legacy_ckpt_path):
-        ckpt = torch.load(legacy_ckpt_path, map_location=args.device, weights_only=True)
-        torch.save(ckpt, versioned_ckpt_path)
-        print(f"  Saved versioned checkpoint: {versioned_ckpt_path}")
 
     Y_pred, Y_prob, metrics = evaluate(
         model, X_test, Y_test, threshold, args.device, dtype, n_classes,

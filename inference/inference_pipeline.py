@@ -8,24 +8,24 @@ This pipeline performs model inference on the pre-processed features.
 
 Usage:
     # On pre-processed features from ESP32 (NPZ file)
-    python inference_pipeline.py --checkpoint checkpoints/fusion_resnet/best.pt \
+    python inference_pipeline.py --checkpoint model_registry/<version>_best.pt \
         --input preprocessed_features.npz --preprocessed
 
     # On pre-processed features directory (batch processing)
-    python inference_pipeline.py --checkpoint checkpoints/fusion_resnet/best.pt \
+    python inference_pipeline.py --checkpoint model_registry/<version>_best.pt \
         --input /path/to/features/dir --preprocessed --device cpu --fp32
 
     # With anomaly detection and measured current
-    python inference_pipeline.py --checkpoint best.pt --input features.npz \
+    python inference_pipeline.py --checkpoint model_registry/<version>_best.pt --input features.npz \
         --preprocessed --enable-anomaly-detection --measured-current 5.2 --device cpu
 
 Legacy usage (for evaluation on raw signals - requires preprocessing):
     # On a CSV file with 'Current' column
-    python inference_pipeline.py --checkpoint best.pt \
+    python inference_pipeline.py --checkpoint model_registry/<version>_best.pt \
         --input recording.csv --sample-rate 30000
 
     # On pre-segmented raw windows
-    python inference_pipeline.py --checkpoint best.pt \
+    python inference_pipeline.py --checkpoint model_registry/<version>_best.pt \
         --input windows.npy --pre-segmented
 """
 

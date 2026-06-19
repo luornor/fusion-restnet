@@ -19,7 +19,7 @@ Usage:
 
 Then run inference on a single recording:
     python inference/inference_pipeline.py \\
-        --checkpoint model_registry/latest_v<name>.pt \\
+        --checkpoint model_registry/<name>_best.pt \\
         --input data/natural/waveform_70000.npy \\
         --sample-rate 15384 --mains-freq 60 \\
         --output inference_results/natural_70000
@@ -27,7 +27,7 @@ Then run inference on a single recording:
 Or batch over all recordings:
     for f in data/natural/waveform_7000*.npy; do
         python inference/inference_pipeline.py \\
-            --checkpoint model_registry/latest_v<name>.pt \\
+            --checkpoint model_registry/<name>_best.pt \\
             --input $f --sample-rate 15384 --mains-freq 60 \\
             --output inference_results/$(basename $f .npy)
     done
@@ -149,7 +149,7 @@ def process_mat(mat_path: Path, out_dir: Path) -> dict:
         "events":        events,
         "inference_command": (
             f"python inference/inference_pipeline.py "
-            f"--checkpoint model_registry/<checkpoint>.pt "
+            f"--checkpoint model_registry/<model_version>_best.pt "
             f"--input data/natural/{out_npy.name} "
             f"--sample-rate {sps} --mains-freq {mains_freq} "
             f"--output inference_results/{waveform_id}"
