@@ -30,6 +30,7 @@ import time
 import random
 import argparse
 import warnings
+import json
 from functools import reduce
 
 import numpy as np
@@ -708,6 +709,236 @@ def evaluate(model, X_test, Y_test, threshold, device, dtype, n_classes,
     return Y_pred, Y_prob, metrics
 
 
+def _safe_filename(value: str) -> str:
+    """Return a filesystem-safe version tag for generated reports."""
+    return ''.join(ch if ch.isalnum() or ch in '._-' else '_' for ch in value)
+
+
+def serialize_metrics(metrics: dict) -> dict:
+    """Convert numpy scalars and integer component keys to JSON-safe values."""
+    metrics_serializable = {}
+    for key, value in metrics.items():
+        if key in {'per_class', 'per_n_components'}:
+            continue
+        if isinstance(value, np.generic):
+            metrics_serializable[key] = value.item()
+        else:
+            metrics_serializable[key] = float(value) if np.isscalar(value) else value
+
+    metrics_serializable['per_class'] = {
+        name: {metric: float(metric_value) for metric, metric_value in values.items()}
+        for name, values in metrics['per_class'].items()
+    }
+    metrics_serializable['per_n_components'] = {
+        str(n_components): {
+            metric: float(metric_value) for metric, metric_value in values.items()
+        }
+        for n_components, values in metrics.get('per_n_components', {}).items()
+    }
+    return metrics_serializable
+
+
+def save_metrics_artifacts(metrics: dict, save_dir: str, model_version: str) -> dict:
+    """Save JSON and CSV metric artifacts used by reports and diagnostics."""
+    os.makedirs(save_dir, exist_ok=True)
+    metrics_serializable = serialize_metrics(metrics)
+    safe_version = _safe_filename(model_version)
+
+    json_paths = [
+        os.path.join(save_dir, 'test_metrics.json'),
+        os.path.join(save_dir, f'test_metrics_{safe_version}.json'),
+    ]
+    for path in json_paths:
+        with open(path, 'w') as f:
+            json.dump(metrics_serializable, f, indent=2)
+    print(f"  Saved: {json_paths[0]}")
+
+    global_keys = [
+        'f1_samples', 'f1_macro', 'f1_micro', 'f1_weighted',
+        'precision_samples', 'precision_macro', 'recall_samples', 'recall_macro',
+        'accuracy', 'hamming_loss', 'jaccard_samples', 'jaccard_macro', 'threshold',
+    ]
+    global_row = {
+        'model_version': model_version,
+        **{key: metrics.get(key, None) for key in global_keys},
+    }
+    global_path = os.path.join(save_dir, 'global_metrics.csv')
+    pd.DataFrame([global_row]).to_csv(global_path, index=False)
+
+    per_class_rows = []
+    for appliance, values in metrics['per_class'].items():
+        precision = float(values['precision'])
+        recall = float(values['recall'])
+        if precision + 0.10 < recall:
+            error_mode = 'false-positive prone'
+        elif recall + 0.10 < precision:
+            error_mode = 'miss-prone'
+        else:
+            error_mode = 'balanced'
+        per_class_rows.append({
+            'appliance': appliance,
+            'f1': float(values['f1']),
+            'precision': precision,
+            'recall': recall,
+            'support': int(values['support']),
+            'error_mode': error_mode,
+        })
+    per_class_path = os.path.join(save_dir, 'per_class_metrics.csv')
+    pd.DataFrame(per_class_rows).sort_values('f1').to_csv(per_class_path, index=False)
+
+    mixture_rows = []
+    for n_components, values in sorted(metrics.get('per_n_components', {}).items()):
+        mixture_rows.append({
+            'n_active': int(n_components),
+            'f1_samples': float(values['f1_samples']),
+            'f1_macro': float(values['f1_macro']),
+            'precision': float(values['precision']),
+            'recall': float(values['recall']),
+            'exact_match': float(values['accuracy']),
+            'n_samples': int(values['n_samples']),
+        })
+    mixture_path = os.path.join(save_dir, 'mixture_complexity_metrics.csv')
+    pd.DataFrame(
+        mixture_rows,
+        columns=['n_active', 'f1_samples', 'f1_macro', 'precision', 'recall', 'exact_match', 'n_samples'],
+    ).to_csv(mixture_path, index=False)
+
+    print(f"  Saved: {global_path}")
+    print(f"  Saved: {per_class_path}")
+    print(f"  Saved: {mixture_path}")
+    return metrics_serializable
+
+
+def write_model_report(history: dict, metrics: dict, save_dir: str, model_version: str):
+    """Write a concise markdown report for the current model run."""
+    os.makedirs(save_dir, exist_ok=True)
+    safe_version = _safe_filename(model_version)
+
+    val_scores = history.get('val', {}).get('score', [])
+    best_epoch = int(np.argmax(val_scores) + 1) if val_scores else None
+    best_val = float(np.max(val_scores)) if val_scores else None
+
+    per_class = pd.DataFrame([
+        {'appliance': name, **values}
+        for name, values in metrics['per_class'].items()
+    ]).sort_values('f1')
+    weakest = per_class.head(5)
+
+    mixture_rows = [
+        {'n_active': int(nc), **values}
+        for nc, values in metrics.get('per_n_components', {}).items()
+    ]
+    mixture_df = pd.DataFrame(mixture_rows)
+    if not mixture_df.empty:
+        mixture_df = mixture_df.sort_values('n_active')
+    realistic = mixture_df[mixture_df['n_active'].between(2, 5)] if not mixture_df.empty else pd.DataFrame()
+
+    recommendations = []
+    low_precision = weakest[weakest['precision'] + 0.10 < weakest['recall']]
+    if not low_precision.empty:
+        names = ', '.join(low_precision['appliance'].tolist())
+        recommendations.append(
+            f"Prioritize false-positive reduction for: {names}. These classes have recall far above precision."
+        )
+    if not realistic.empty and realistic['f1_samples'].mean() < metrics['f1_samples']:
+        recommendations.append(
+            "Track the 2-5 active-appliance band separately; it is more deployment-relevant than the all-devices-on cases."
+        )
+    if abs(float(metrics['threshold']) - 0.5) > 0.08:
+        recommendations.append(
+            "Run calibration or class-specific threshold tuning before deployment; the global threshold is far from 0.50."
+        )
+    if not recommendations:
+        recommendations.append("No urgent reporting red flags found; compare against the next run before changing thresholds.")
+
+    lines = [
+        f"# Fusion-ResNet Model Report - {model_version}",
+        "",
+        "## Global Metrics",
+        "",
+        "| Metric | Value |",
+        "|---|---:|",
+        f"| F1 samples | {metrics['f1_samples']:.4f} |",
+        f"| F1 macro | {metrics['f1_macro']:.4f} |",
+        f"| Precision samples | {metrics['precision_samples']:.4f} |",
+        f"| Recall samples | {metrics['recall_samples']:.4f} |",
+        f"| Exact match accuracy | {metrics['accuracy']:.4f} |",
+        f"| Hamming loss | {metrics['hamming_loss']:.4f} |",
+        f"| Threshold | {metrics['threshold']:.4f} |",
+        "",
+    ]
+
+    if best_epoch is not None:
+        lines += [
+            "## Training Snapshot",
+            "",
+            f"- Best validation F1: {best_val:.4f} at epoch {best_epoch}",
+            f"- Final validation F1: {history['val']['score'][-1]:.4f}",
+            f"- Final training F1: {history['train']['score'][-1]:.4f}",
+            "",
+        ]
+
+    lines += [
+        "## Weakest Appliances",
+        "",
+        "| Appliance | F1 | Precision | Recall | Support | Likely issue |",
+        "|---|---:|---:|---:|---:|---|",
+    ]
+    for _, row in weakest.iterrows():
+        if row['precision'] + 0.10 < row['recall']:
+            issue = "false positives"
+        elif row['recall'] + 0.10 < row['precision']:
+            issue = "misses"
+        else:
+            issue = "balanced errors"
+        lines.append(
+            f"| {row['appliance']} | {row['f1']:.4f} | {row['precision']:.4f} | "
+            f"{row['recall']:.4f} | {int(row['support'])} | {issue} |"
+        )
+
+    if not realistic.empty:
+        lines += [
+            "",
+            "## Deployment-Relevant Mixture Band",
+            "",
+            "| Active appliances | Mean F1 samples | Mean exact match | Samples |",
+            "|---:|---:|---:|---:|",
+            (
+                f"| 2-5 | {realistic['f1_samples'].mean():.4f} | "
+                f"{realistic['accuracy'].mean():.4f} | {int(realistic['n_samples'].sum())} |"
+            ),
+        ]
+
+    lines += [
+        "",
+        "## Recommendations",
+        "",
+    ]
+    lines += [f"- {item}" for item in recommendations]
+    lines += [
+        "",
+        "## Generated Artifacts",
+        "",
+        "- `test_metrics.json` and versioned copy",
+        "- `global_metrics.csv`",
+        "- `per_class_metrics.csv`",
+        "- `mixture_complexity_metrics.csv`",
+        "- `training_curves.png`",
+        "- `per_appliance_f1.png`",
+        "- `f1_by_components.png`",
+        "",
+    ]
+
+    report_paths = [
+        os.path.join(save_dir, 'model_report.md'),
+        os.path.join(save_dir, f'model_report_{safe_version}.md'),
+    ]
+    for path in report_paths:
+        with open(path, 'w') as f:
+            f.write('\n'.join(lines))
+    print(f"  Saved: {report_paths[0]}")
+
+
 # ==============================================================================
 # Paper-Style Plots
 # ==============================================================================
@@ -748,18 +979,22 @@ def plot_training_curves(history, save_dir='figures'):
 
 
 def plot_per_class_f1_bars(metrics, save_dir='figures'):
-    """Plot 2: Per-appliance F1 score bar chart (paper Figure: f1 bars)."""
+    """Plot 2: Per-appliance metrics sorted by weakest F1 first."""
     os.makedirs(save_dir, exist_ok=True)
 
-    names = list(metrics['per_class'].keys())
-    f1s = [v['f1'] for v in metrics['per_class'].values()]
-    precs = [v['precision'] for v in metrics['per_class'].values()]
-    recs = [v['recall'] for v in metrics['per_class'].values()]
+    rows = sorted(
+        [(name, values) for name, values in metrics['per_class'].items()],
+        key=lambda item: item[1]['f1'],
+    )
+    names = [name for name, _ in rows]
+    f1s = [v['f1'] for _, v in rows]
+    precs = [v['precision'] for _, v in rows]
+    recs = [v['recall'] for _, v in rows]
 
     x = np.arange(len(names))
     width = 0.25
 
-    fig, ax = plt.subplots(figsize=(14, 6))
+    fig, ax = plt.subplots(figsize=(14, 6.5))
     bars1 = ax.bar(x - width, f1s, width, label='F1 Score', color='#2196F3', alpha=0.85, edgecolor='white')
     bars2 = ax.bar(x, precs, width, label='Precision', color='#4CAF50', alpha=0.85, edgecolor='white')
     bars3 = ax.bar(x + width, recs, width, label='Recall', color='#FF9800', alpha=0.85, edgecolor='white')
@@ -770,6 +1005,8 @@ def plot_per_class_f1_bars(metrics, save_dir='figures'):
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=45, ha='right', fontsize=9)
     ax.set_ylim(0, 1.05)
+    ax.axhline(metrics['f1_macro'], color='#455A64', linestyle=':', linewidth=1.4,
+               label='Macro F1')
     ax.legend(loc='upper right', framealpha=0.9)
 
     # Add value labels on F1 bars
@@ -808,6 +1045,9 @@ def plot_f1_by_components(metrics, save_dir='figures'):
              markersize=6, label='F1 (macro)', zorder=3)
     ax1.plot(nc_list, accuracies, 'D:', color='#4CAF50', linewidth=1.5,
              markersize=5, label='Exact Match Acc', alpha=0.7, zorder=3)
+    if min(nc_list) <= 5 and max(nc_list) >= 2:
+        ax1.axvspan(2, 5, color='#FFF3E0', alpha=0.75, zorder=0,
+                    label='Typical 2-5 appliance band')
 
     ax1.set_xlabel('Number of Simultaneously Active Appliances')
     ax1.set_ylabel('Score')
@@ -958,16 +1198,13 @@ def plot_summary_dashboard(history, metrics, save_dir='figures'):
 
 
 def generate_all_plots(history, metrics, save_dir='figures'):
-    """Generate all paper-style plots."""
+    """Generate the core reporting plots for one model run."""
     print(f"\nGenerating plots → {save_dir}/")
     os.makedirs(save_dir, exist_ok=True)
 
     plot_training_curves(history, save_dir)
     plot_per_class_f1_bars(metrics, save_dir)
     plot_f1_by_components(metrics, save_dir)
-    plot_per_class_heatmap(metrics, save_dir)
-    plot_lr_schedule(history, save_dir)
-    plot_summary_dashboard(history, metrics, save_dir)
 
     print(f"  All plots saved to {save_dir}/\n")
 
@@ -1187,11 +1424,6 @@ def main():
         appliance_names=appliance_names, batch_size=args.batch_size,
     )
 
-    # Save raw probabilities for calibration diagnostics
-    os.makedirs(args.figures_dir, exist_ok=True)
-    np.save(os.path.join(args.figures_dir, 'Y_prob.npy'), Y_prob)
-    np.save(os.path.join(args.figures_dir, 'Y_true.npy'), Y_test)
-
     # Post-training temperature scaling calibration
     if args.calibrate:
         print("\n  Running temperature scaling calibration on validation set...")
@@ -1231,25 +1463,21 @@ def main():
             from sklearn.metrics import f1_score as _f1
             f1_cal = _f1(Y_test, Y_pred_cal, average='samples', zero_division=0)
             print(f"  Calibrated test F1 (samples): {f1_cal:.4f} (uncalibrated: {metrics['f1_samples']:.4f})")
+            Y_pred = Y_pred_cal
+            Y_prob = cal_test_probs
+            threshold = cal_threshold
+            metrics = compute_all_metrics(Y_test, Y_pred, threshold, appliance_names)
         except ImportError:
             print("  [skip] temperature_scaling.py not found")
 
-    # Save metrics to JSON
-    import json
-    metrics_serializable = {k: v for k, v in metrics.items() if k != 'per_class'}
-    metrics_serializable['per_class'] = {
-        k: {mk: float(mv) for mk, mv in v.items()}
-        for k, v in metrics['per_class'].items()
-    }
-    metrics_serializable['per_n_components'] = {
-        str(k): {mk: float(mv) for mk, mv in v.items()}
-        for k, v in metrics.get('per_n_components', {}).items()
-    }
-    with open(os.path.join(args.figures_dir, 'test_metrics.json'), 'w') as f:
-        json.dump(metrics_serializable, f, indent=2)
-    with open(os.path.join(args.figures_dir, f'test_metrics_{args.model_version}.json'), 'w') as f:
-        json.dump(metrics_serializable, f, indent=2)
-    print(f"  Saved: {args.figures_dir}/test_metrics.json")
+    # Save probabilities used by the reported metrics.
+    os.makedirs(args.figures_dir, exist_ok=True)
+    np.save(os.path.join(args.figures_dir, 'Y_prob.npy'), Y_prob)
+    np.save(os.path.join(args.figures_dir, 'Y_true.npy'), Y_test)
+
+    # Save machine-readable metrics and a concise markdown run report.
+    save_metrics_artifacts(metrics, args.figures_dir, args.model_version)
+    write_model_report(history, metrics, args.figures_dir, args.model_version)
 
     # Generate all plots
     generate_all_plots(history, metrics, save_dir=args.figures_dir)
