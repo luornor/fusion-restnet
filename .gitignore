@@ -6,6 +6,19 @@ __pycache__/
 # Model checkpoints (large files)
 model_registry/*.pt
 model_registry/*.pth
+# Keep only releasable multi-source checkpoints in git.
+!model_registry/*[Mm]ulti*[Ss]ource*_best.pt
+!model_registry/*[Mm]ulti*[Ss]ource*_last.pt
+!model_registry/*[Mm]ulti*[Ss]ource*_best.pth
+!model_registry/*[Mm]ulti*[Ss]ource*_last.pth
+!model_registry/*[Cc]ombined*_best.pt
+!model_registry/*[Cc]ombined*_last.pt
+!model_registry/*[Cc]ombined*_best.pth
+!model_registry/*[Cc]ombined*_last.pth
+!model_registry/*[Ll]umina*_best.pt
+!model_registry/*[Ll]umina*_last.pt
+!model_registry/*[Ll]umina*_best.pth
+!model_registry/*[Ll]umina*_last.pth
 
 # Combined dataset arrays — regenerate via: python preprocessing/merge_datasets.py
 data/combined/X_combined.npy
