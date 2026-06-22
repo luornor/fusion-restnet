@@ -20,6 +20,10 @@ model_registry/*.pth
 !model_registry/*[Ll]umina*_best.pth
 !model_registry/*[Ll]umina*_last.pth
 
+# Large evaluation arrays regenerated each training run — not useful in git
+reports/figures/Y_prob.npy
+reports/figures/Y_true.npy
+
 # Combined dataset arrays — regenerate via: python preprocessing/merge_datasets.py
 data/combined/X_combined.npy
 data/combined/y_combined.npy
