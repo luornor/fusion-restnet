@@ -55,6 +55,7 @@ from fusion_resnet import (
     build_split_model_from_full_checkpoint,
 )
 from anomaly_detector import AnomalyDetector
+from temporal_smoother import build_smoother_from_args
 
 warnings.filterwarnings('ignore')
 
@@ -104,6 +105,22 @@ def parse_args():
                         help='Directory with training metadata (for label names fallback)')
     parser.add_argument('--top-k', type=int, default=None,
                         help='Only show top-k most confident appliances per window')
+    # -- Temporal smoothing ------------------------------------------------
+    parser.add_argument('--enable-temporal-smoothing', action='store_true',
+                        help='Apply EMA + hysteresis temporal postprocessing to raw probabilities')
+    parser.add_argument('--temporal-alpha', type=float, default=0.3,
+                        help='EMA decay coefficient (0=max smoothing, 1=no smoothing; default 0.3)')
+    parser.add_argument('--temporal-on-threshold', type=float, default=0.45,
+                        help='Smoothed probability to switch appliance ON (default 0.45)')
+    parser.add_argument('--temporal-off-threshold', type=float, default=0.30,
+                        help='Smoothed probability to switch appliance OFF (default 0.30)')
+    parser.add_argument('--temporal-min-on-windows', type=int, default=3,
+                        help='Minimum consecutive ON windows to keep an event (default 3)')
+    parser.add_argument('--temporal-min-off-windows', type=int, default=2,
+                        help='Minimum consecutive OFF windows; shorter gaps are bridged (default 2)')
+    parser.add_argument('--temporal-config', type=str, default=None,
+                        help='Path to JSON with class-specific temporal config overrides')
+    # -- Anomaly detection -------------------------------------------------
     parser.add_argument('--enable-anomaly-detection', action='store_true',
                         help='Enable fault detection and anomaly monitoring')
     parser.add_argument('--anomaly-history', type=str, default=None,
@@ -518,7 +535,9 @@ def format_results(predictions: np.ndarray, probabilities: np.ndarray,
                    appliance_names: list[str],
                    anomaly_detector: AnomalyDetector | None = None,
                    measured_current: float | None = None,
-                   top_k: int = None) -> list[dict]:
+                   top_k: int = None,
+                   smoothed_probs: np.ndarray | None = None,
+                   temporal_active: np.ndarray | None = None) -> list[dict]:
     """Format predictions into human-readable results.
 
     Returns:
@@ -547,6 +566,13 @@ def format_results(predictions: np.ndarray, probabilities: np.ndarray,
             'active_appliances': active_appliances,
             'n_active': len(active_appliances),
         }
+
+        if temporal_active is not None:
+            temporal_indices = np.where(temporal_active[i] == 1)[0]
+            entry['temporal_active_appliances'] = [
+                appliance_names[j] for j in temporal_indices
+            ]
+            entry['n_temporal_active'] = len(temporal_indices)
 
         if timestamps is not None:
             entry['time_start_s'] = float(timestamps[i])
@@ -719,8 +745,17 @@ def save_results(results: list[dict], predictions: np.ndarray,
                  probabilities: np.ndarray, timestamps: np.ndarray | None,
                  windows: np.ndarray, appliance_names: list[str],
                  output_dir: str, sample_rate: int = 0,
-                 window_duration_s: float = 0.0):
-    """Save inference results to files."""
+                 window_duration_s: float = 0.0,
+                 smoothed_probs: np.ndarray | None = None,
+                 temporal_active: np.ndarray | None = None):
+    """Save inference results to files.
+
+    When temporal smoothing was applied, also saves:
+      smoothed_probabilities.npy  (N, C) EMA-smoothed probs
+      temporal_active.npy         (N, C) binary after full postprocessing pipeline
+    The CSV gains {name}_smoothed_prob and {name}_temporal_active columns.
+    Raw predictions are always preserved for comparison.
+    """
     os.makedirs(output_dir, exist_ok=True)
 
     # Save JSON results
@@ -729,6 +764,7 @@ def save_results(results: list[dict], predictions: np.ndarray,
         json.dump({
             'n_windows': len(results),
             'appliance_names': appliance_names,
+            'temporal_smoothing_applied': temporal_active is not None,
             'results': results,
         }, f, indent=2)
     print(f"  Saved: {json_path}")
@@ -740,8 +776,12 @@ def save_results(results: list[dict], predictions: np.ndarray,
         if 'time_start_s' in result:
             row['time_s'] = result['time_start_s']
         for j, name in enumerate(appliance_names):
-            row[f'{name}_pred'] = int(predictions[i, j])
-            row[f'{name}_prob'] = float(probabilities[i, j])
+            row[f'{name}_raw_prob'] = float(probabilities[i, j])
+            row[f'{name}_raw_active'] = int(predictions[i, j])
+            if smoothed_probs is not None:
+                row[f'{name}_smoothed_prob'] = float(smoothed_probs[i, j])
+            if temporal_active is not None:
+                row[f'{name}_temporal_active'] = int(temporal_active[i, j])
         rows.append(row)
 
     df = pd.DataFrame(rows)
@@ -749,12 +789,18 @@ def save_results(results: list[dict], predictions: np.ndarray,
     df.to_csv(csv_path, index=False)
     print(f"  Saved: {csv_path}")
 
-    # Save raw arrays
+    # Save raw arrays (always)
     np.save(os.path.join(output_dir, 'predictions.npy'), predictions)
     np.save(os.path.join(output_dir, 'probabilities.npy'), probabilities)
     np.save(os.path.join(output_dir, 'windows.npy'), windows)
     if timestamps is not None:
         np.save(os.path.join(output_dir, 'timestamps.npy'), timestamps)
+
+    # Save temporal arrays when smoothing was applied
+    if smoothed_probs is not None:
+        np.save(os.path.join(output_dir, 'smoothed_probabilities.npy'), smoothed_probs)
+    if temporal_active is not None:
+        np.save(os.path.join(output_dir, 'temporal_active.npy'), temporal_active)
 
     # Save metadata for postprocessor
     meta = {
@@ -765,11 +811,13 @@ def save_results(results: list[dict], predictions: np.ndarray,
         'window_duration_s': float(window_duration_s),
         'appliance_names': appliance_names,
         'has_timestamps': timestamps is not None,
+        'temporal_smoothing_applied': temporal_active is not None,
     }
     with open(os.path.join(output_dir, 'metadata.json'), 'w') as f:
         json.dump(meta, f, indent=2)
 
-    print(f"  Saved numpy arrays + metadata to {output_dir}/")
+    suffix = " + temporal smoothing" if temporal_active is not None else ""
+    print(f"  Saved numpy arrays{suffix} + metadata to {output_dir}/")
 
 
 # ==============================================================================
@@ -911,13 +959,40 @@ def main():
           f"({len(predictions) / elapsed:.0f} windows/sec)")
 
     # ------------------------------------------------------------------
-    # 6. Format and save results
+    # 6. Temporal smoothing (optional)
+    # ------------------------------------------------------------------
+    smoothed_probs = None
+    temporal_active = None
+
+    if args.enable_temporal_smoothing:
+        print("\n[TS] Applying temporal smoothing...")
+        smoother = build_smoother_from_args(
+            appliance_names=appliance_names,
+            config_path=args.temporal_config,
+            alpha=args.temporal_alpha,
+            on_threshold=args.temporal_on_threshold,
+            off_threshold=args.temporal_off_threshold,
+            min_on_windows=args.temporal_min_on_windows,
+            min_off_windows=args.temporal_min_off_windows,
+        )
+        print(smoother.describe())
+        smoothed_probs, temporal_active = smoother.smooth(probabilities)
+
+        raw_on = int(predictions.sum())
+        temp_on = int(temporal_active.sum())
+        print(f"  Raw active windows: {raw_on:,}  ->  Temporal: {temp_on:,} "
+              f"({(temp_on - raw_on) / max(raw_on, 1) * 100:+.1f}%)")
+
+    # ------------------------------------------------------------------
+    # 7. Format and save results
     # ------------------------------------------------------------------
     results = format_results(
         predictions, probabilities, timestamps, appliance_names,
         anomaly_detector=anomaly_detector,
         measured_current=args.measured_current,
-        top_k=args.top_k)
+        top_k=args.top_k,
+        smoothed_probs=smoothed_probs,
+        temporal_active=temporal_active)
 
     print_results_summary(results, appliance_names, predictions)
 
@@ -931,7 +1006,9 @@ def main():
     save_results(results, predictions, probabilities, timestamps,
                  windows, appliance_names, args.output,
                  sample_rate=args.sample_rate,
-                 window_duration_s=window_duration_s)
+                 window_duration_s=window_duration_s,
+                 smoothed_probs=smoothed_probs,
+                 temporal_active=temporal_active)
 
     # Save mobile payload
     mobile_payload = create_mobile_payload(

@@ -1,0 +1,2 @@
+appliance,class_idx,start_s,end_s,duration_s,n_windows,power_on_W,power_baseline_W,power_delta_W,energy_Wh
+Vacuum,12,0.0,899.93,899.93,10816,146.92,0.0,146.92,36.7282

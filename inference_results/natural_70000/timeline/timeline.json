@@ -1,0 +1,17 @@
+{
+  "n_events": 1,
+  "intervals": [
+    {
+      "appliance": "Vacuum",
+      "class_idx": 12,
+      "start_s": 0.0,
+      "end_s": 899.93,
+      "duration_s": 899.93,
+      "n_windows": 10816,
+      "power_on_W": 146.92,
+      "power_baseline_W": 0.0,
+      "power_delta_W": 146.92,
+      "energy_Wh": 36.7282
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "n_windows": 10816,
+  "n_classes": 15,
+  "window_size": 400,
+  "sample_rate": 15384,
+  "window_duration_s": 0.08320332813312532,
+  "appliance_names": [
+    "Air Conditioner",
+    "Coffee maker",
+    "Compact Fluorescent Lamp",
+    "Fan",
+    "Fridge",
+    "Hair Iron",
+    "Hairdryer",
+    "Heater",
+    "Incandescent Light Bulb",
+    "Laptop",
+    "Microwave",
+    "Soldering Iron",
+    "Vacuum",
+    "Washing Machine",
+    "Water kettle"
+  ],
+  "has_timestamps": true,
+  "temporal_smoothing_applied": true
+}

@@ -1,0 +1,300 @@
+{
+  "metadata": {
+    "timestamp": "2026-07-13T18:29:35.995522+00:00",
+    "model_version": "1.0",
+    "variant": "preprocessed",
+    "n_windows": 10816,
+    "inference_time_ms": 3807.915210723877
+  },
+  "summary": {
+    "most_active_appliance": "Vacuum",
+    "avg_active_per_window": 1.3006656804733727,
+    "total_anomalies": 0,
+    "anomaly_types": {}
+  },
+  "appliances": {
+    "Air Conditioner": {
+      "detected": false,
+      "detection_rate": 0.0,
+      "detections": 0,
+      "avg_confidence": 0.0,
+      "max_confidence": 0.13989585638046265,
+      "min_confidence": 1.5418434486491606e-05
+    },
+    "Coffee maker": {
+      "detected": true,
+      "detection_rate": 0.07396449704142012,
+      "detections": 8,
+      "avg_confidence": 0.30394548177719116,
+      "max_confidence": 0.33866193890571594,
+      "min_confidence": 0.0006735861534252763
+    },
+    "Compact Fluorescent Lamp": {
+      "detected": true,
+      "detection_rate": 4.095784023668639,
+      "detections": 443,
+      "avg_confidence": 0.7514030337333679,
+      "max_confidence": 0.9999957084655762,
+      "min_confidence": 1.3407283461219777e-07
+    },
+    "Fan": {
+      "detected": false,
+      "detection_rate": 0.0,
+      "detections": 0,
+      "avg_confidence": 0.0,
+      "max_confidence": 0.20662204921245575,
+      "min_confidence": 5.235351181909209e-06
+    },
+    "Fridge": {
+      "detected": true,
+      "detection_rate": 0.12943786982248523,
+      "detections": 14,
+      "avg_confidence": 0.35548195242881775,
+      "max_confidence": 0.9405393004417419,
+      "min_confidence": 0.001274073263630271
+    },
+    "Hair Iron": {
+      "detected": false,
+      "detection_rate": 0.0,
+      "detections": 0,
+      "avg_confidence": 0.0,
+      "max_confidence": 0.0018910887883976102,
+      "min_confidence": 1.6625075644762736e-16
+    },
+    "Hairdryer": {
+      "detected": false,
+      "detection_rate": 0.0,
+      "detections": 0,
+      "avg_confidence": 0.0,
+      "max_confidence": 0.289306104183197,
+      "min_confidence": 5.736354751206818e-07
+    },
+    "Heater": {
+      "detected": true,
+      "detection_rate": 0.01849112426035503,
+      "detections": 2,
+      "avg_confidence": 0.29336169362068176,
+      "max_confidence": 0.2943769097328186,
+      "min_confidence": 0.0001016426322166808
+    },
+    "Incandescent Light Bulb": {
+      "detected": false,
+      "detection_rate": 0.0,
+      "detections": 0,
+      "avg_confidence": 0.0,
+      "max_confidence": 0.018915338441729546,
+      "min_confidence": 1.2251487151171414e-11
+    },
+    "Laptop": {
+      "detected": true,
+      "detection_rate": 25.989275147928993,
+      "detections": 2811,
+      "avg_confidence": 0.439279168844223,
+      "max_confidence": 0.991773784160614,
+      "min_confidence": 0.022810539230704308
+    },
+    "Microwave": {
+      "detected": true,
+      "detection_rate": 0.33284023668639057,
+      "detections": 36,
+      "avg_confidence": 0.5437467098236084,
+      "max_confidence": 0.987038791179657,
+      "min_confidence": 0.0015591505216434598
+    },
+    "Soldering Iron": {
+      "detected": true,
+      "detection_rate": 0.1201923076923077,
+      "detections": 13,
+      "avg_confidence": 0.2951543927192688,
+      "max_confidence": 0.31812000274658203,
+      "min_confidence": 0.00913707073777914
+    },
+    "Vacuum": {
+      "detected": true,
+      "detection_rate": 97.10613905325444,
+      "detections": 10503,
+      "avg_confidence": 0.8992953300476074,
+      "max_confidence": 0.9997074007987976,
+      "min_confidence": 0.01251867413520813
+    },
+    "Washing Machine": {
+      "detected": true,
+      "detection_rate": 1.67344674556213,
+      "detections": 181,
+      "avg_confidence": 0.3230091631412506,
+      "max_confidence": 0.3832354247570038,
+      "min_confidence": 0.0007579319062642753
+    },
+    "Water kettle": {
+      "detected": true,
+      "detection_rate": 0.5269970414201184,
+      "detections": 57,
+      "avg_confidence": 0.32087987661361694,
+      "max_confidence": 0.3918852210044861,
+      "min_confidence": 0.0014078511158004403
+    }
+  },
+  "anomalies": [],
+  "recent_windows": [
+    {
+      "window": 0,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9985490441322327
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.0,
+      "timestamp": "1970-01-01T00:00:00+00:00"
+    },
+    {
+      "window": 1,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9986893534660339
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.08320332813312532,
+      "timestamp": "1970-01-01T00:00:00.083203+00:00"
+    },
+    {
+      "window": 2,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9990617632865906
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.16640665626625065,
+      "timestamp": "1970-01-01T00:00:00.166407+00:00"
+    },
+    {
+      "window": 3,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9988734126091003
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.24960998439937598,
+      "timestamp": "1970-01-01T00:00:00.249610+00:00"
+    },
+    {
+      "window": 4,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9988357424736023
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.3328133125325013,
+      "timestamp": "1970-01-01T00:00:00.332813+00:00"
+    },
+    {
+      "window": 5,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9985686540603638
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.4160166406656266,
+      "timestamp": "1970-01-01T00:00:00.416017+00:00"
+    },
+    {
+      "window": 6,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9984748959541321
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.49921996879875197,
+      "timestamp": "1970-01-01T00:00:00.499220+00:00"
+    },
+    {
+      "window": 7,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9981756210327148
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.5824232969318772,
+      "timestamp": "1970-01-01T00:00:00.582423+00:00"
+    },
+    {
+      "window": 8,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9978455305099487
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.6656266250650026,
+      "timestamp": "1970-01-01T00:00:00.665627+00:00"
+    },
+    {
+      "window": 9,
+      "active_appliances": [
+        {
+          "name": "Vacuum",
+          "confidence": 0.9764031767845154
+        }
+      ],
+      "n_active": 1,
+      "temporal_active_appliances": [
+        "Vacuum"
+      ],
+      "n_temporal_active": 1,
+      "time_start_s": 0.748829953198128,
+      "timestamp": "1970-01-01T00:00:00.748830+00:00"
+    }
+  ]
+}

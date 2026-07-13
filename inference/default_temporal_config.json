@@ -1,0 +1,73 @@
+{
+  "_note": "Temporal smoothing config for Fusion-ResNet multi-source-v1.",
+  "_note2": "CLI flags override 'default'. Per-class entries override CLI flags for that class.",
+  "_note3": "Thresholds apply to EMA-smoothed probabilities, not raw model outputs.",
+  "_note4": "Tighter settings on false-positive-prone classes (precision 0.59-0.66 on test set).",
+
+  "default": {
+    "alpha": 0.30,
+    "on_threshold": 0.42,
+    "off_threshold": 0.28,
+    "min_on_windows": 3,
+    "min_off_windows": 2
+  },
+
+  "classes": {
+    "Soldering Iron": {
+      "_precision": 0.594,
+      "alpha": 0.20,
+      "on_threshold": 0.58,
+      "off_threshold": 0.36,
+      "min_on_windows": 7,
+      "min_off_windows": 3
+    },
+    "Water kettle": {
+      "_precision": 0.595,
+      "alpha": 0.20,
+      "on_threshold": 0.58,
+      "off_threshold": 0.36,
+      "min_on_windows": 7,
+      "min_off_windows": 3
+    },
+    "Coffee maker": {
+      "_precision": 0.602,
+      "alpha": 0.22,
+      "on_threshold": 0.54,
+      "off_threshold": 0.33,
+      "min_on_windows": 6,
+      "min_off_windows": 3
+    },
+    "Washing Machine": {
+      "_precision": 0.647,
+      "alpha": 0.25,
+      "on_threshold": 0.50,
+      "off_threshold": 0.32,
+      "min_on_windows": 5,
+      "min_off_windows": 3
+    },
+    "Vacuum": {
+      "_precision": 0.639,
+      "alpha": 0.25,
+      "on_threshold": 0.50,
+      "off_threshold": 0.32,
+      "min_on_windows": 5,
+      "min_off_windows": 3
+    },
+    "Fan": {
+      "_precision": 0.647,
+      "alpha": 0.25,
+      "on_threshold": 0.48,
+      "off_threshold": 0.30,
+      "min_on_windows": 5,
+      "min_off_windows": 2
+    },
+    "Air Conditioner": {
+      "_precision": 0.662,
+      "alpha": 0.25,
+      "on_threshold": 0.48,
+      "off_threshold": 0.30,
+      "min_on_windows": 5,
+      "min_off_windows": 2
+    }
+  }
+}

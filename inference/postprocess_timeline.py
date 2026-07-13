@@ -65,6 +65,8 @@ def parse_args():
                              '(default: auto from metadata or timestamps)')
     parser.add_argument('--no-plots', action='store_true',
                         help='Skip generating plots')
+    parser.add_argument('--use-raw-predictions', action='store_true',
+                        help='Use raw model predictions even when temporal_active.npy is present')
     return parser.parse_args()
 
 
@@ -108,6 +110,19 @@ def load_inference_outputs(input_dir: str) -> dict:
         data['windows'] = np.load(win_path)
     else:
         data['windows'] = None
+
+    # Optional: temporal smoothing outputs from inference_pipeline.py
+    ta_path = os.path.join(input_dir, 'temporal_active.npy')
+    if os.path.exists(ta_path):
+        data['temporal_active'] = np.load(ta_path)
+    else:
+        data['temporal_active'] = None
+
+    sp_path = os.path.join(input_dir, 'smoothed_probabilities.npy')
+    if os.path.exists(sp_path):
+        data['smoothed_probabilities'] = np.load(sp_path)
+    else:
+        data['smoothed_probabilities'] = None
 
     return data
 
@@ -554,19 +569,30 @@ def main():
     print(f"  Window duration: {window_dur*1000:.1f}ms ({windows_per_sec:.1f}/sec)")
     print(f"  Total duration:  {total_time:.1f}s ({total_time/60:.1f} min)")
 
-    # ---- Compute smoothing kernel ----
-    kernel = max(3, int(args.smooth_window * windows_per_sec))
-    if kernel % 2 == 0:
-        kernel += 1
-    print(f"  Smoothing kernel: {kernel} windows ({kernel * window_dur:.1f}s)")
+    # ---- Step 1: Smooth or use pre-computed temporal predictions ----
+    temporal_active = data.get('temporal_active')
+    use_temporal = (temporal_active is not None) and (not args.use_raw_predictions)
 
-    # ---- Step 1: Smooth ----
-    print("\n[1/4] Smoothing predictions...")
-    smoothed = smooth_predictions(preds, kernel)
-    raw_on = int(preds.sum())
-    smooth_on = int(smoothed.sum())
-    print(f"  Raw ON: {raw_on:,} -> Smoothed: {smooth_on:,} "
-          f"({(smooth_on - raw_on) / max(raw_on, 1) * 100:+.1f}%)")
+    if use_temporal:
+        print("\n[1/4] Using pre-computed temporal predictions (from inference_pipeline.py)...")
+        smoothed = temporal_active.astype(int)
+        raw_on = int(preds.sum())
+        smooth_on = int(smoothed.sum())
+        print(f"  Raw active: {raw_on:,}  ->  Temporal active: {smooth_on:,} "
+              f"({(smooth_on - raw_on) / max(raw_on, 1) * 100:+.1f}%)")
+    else:
+        # ---- Compute smoothing kernel ----
+        kernel = max(3, int(args.smooth_window * windows_per_sec))
+        if kernel % 2 == 0:
+            kernel += 1
+        print(f"  Smoothing kernel: {kernel} windows ({kernel * window_dur:.1f}s)")
+
+        print("\n[1/4] Smoothing predictions (majority vote)...")
+        smoothed = smooth_predictions(preds, kernel)
+        raw_on = int(preds.sum())
+        smooth_on = int(smoothed.sum())
+        print(f"  Raw ON: {raw_on:,} -> Smoothed: {smooth_on:,} "
+              f"({(smooth_on - raw_on) / max(raw_on, 1) * 100:+.1f}%)")
 
     # ---- Step 2: Estimate power ----
     print("\n[2/4] Estimating power...")
