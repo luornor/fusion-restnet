@@ -2,32 +2,33 @@
   "sources": [
     "PLAID (19400)",
     "HIFDA (16000)",
-    "WHITED (26000)"
+    "WHITED (26000)",
+    "COOLL (6000)"
   ],
-  "total_samples": 61400,
+  "total_samples": 67400,
   "X_shape": [
-    61400,
+    67400,
     400
   ],
   "X_dtype": "float32",
-  "global_mean": 0.0008798249182291329,
-  "global_std": 1.801630973815918,
-  "mains_hz": "mixed (PLAID=60Hz, HIFDA=50Hz, WHITED=50Hz)",
+  "global_mean": 0.0006574230501428246,
+  "global_std": 1.7237619161605835,
+  "mains_hz": "mixed (PLAID=60Hz, HIFDA=50Hz, WHITED=50Hz, COOLL=50Hz)",
   "classes": {
     "Air Conditioner": 7841,
     "Blender": 2,
     "Coffee maker": 4013,
     "Compact Fluorescent Lamp": 4218,
-    "Fan": 4946,
+    "Fan": 6946,
     "Fridge": 3839,
     "Hair Iron": 15,
-    "Hairdryer": 6383,
+    "Hairdryer": 8383,
     "Heater": 4606,
     "Incandescent Light Bulb": 1788,
     "Laptop": 4638,
     "Microwave": 5813,
     "Soldering Iron": 2028,
-    "Vacuum": 4292,
+    "Vacuum": 6292,
     "Washing Machine": 4965,
     "Water kettle": 2013
   }

@@ -84,6 +84,10 @@ def parse_args():
     parser.add_argument('--sample-rate', type=int, default=30000,
                         help='Sampling rate of raw input data in Hz (default: 30000). '
                              'Ignored if --preprocessed is used.')
+    parser.add_argument('--mains-freq', type=int, default=50,
+                        help='Mains grid frequency in Hz (default: 50 for Ghana/Europe; '
+                             'use 60 for US/Canada). Controls how many raw samples '
+                             'make up one window (10 cycles).')
     parser.add_argument('--window-size', type=int, default=400,
                         help='Model input window size in samples (default: 400)')
     parser.add_argument('--stride', type=int, default=None,
@@ -462,7 +466,8 @@ def run_inference_preprocessed(model, feature_tensors: tuple,
 
 def load_input(input_path: str, pre_segmented: bool = False,
                sample_rate: int = 30000, window_size: int = 400,
-               stride: int = None) -> tuple[np.ndarray, np.ndarray | None]:
+               stride: int = None,
+               mains_freq: int = 50) -> tuple[np.ndarray, np.ndarray | None]:
     """Load input data from various formats.
 
     Supports:
@@ -519,7 +524,7 @@ def load_input(input_path: str, pre_segmented: bool = False,
 
     # Segment into windows
     windows, timestamps = segment_continuous_signal(
-        signal, sample_rate, window_size, stride)
+        signal, sample_rate, window_size, stride, mains_freq=mains_freq)
     windows = normalize_windows(windows)
 
     print(f"  Segmented into {len(windows)} windows")
@@ -921,10 +926,11 @@ def main():
         print(f"  Pre-processed features ready: {n_windows} windows")
     else:
         # Load raw signal and preprocess
+        print(f"  Mains frequency: {args.mains_freq} Hz")
         windows, timestamps = load_input(
             args.input, args.pre_segmented, args.sample_rate,
-            args.window_size, stride)
-        
+            args.window_size, stride, mains_freq=args.mains_freq)
+
         print(f"  Windows ready: {windows.shape}")
         feature_tensors = None
 
