@@ -46,6 +46,39 @@ from torch.utils.data import DataLoader, Dataset
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingWarmRestarts
 
 from sklearn.model_selection import train_test_split
+
+
+def load_groups(data_dir, n_expected, keep_mask=None):
+    """Load per-window source-recording ids, if preprocessing emitted them.
+
+    Each window's group is the recording it was cut from. Windows sharing a
+    group are near-duplicates and must never straddle a split boundary.
+
+    Returns an (N,) array aligned with X_real, or None when unavailable.
+    """
+    import glob as _glob
+
+    candidates = sorted(_glob.glob(os.path.join(data_dir, '**', 'groups_*.npy'),
+                                   recursive=True))
+    if not candidates:
+        return None
+
+    try:
+        parts = [np.load(c, allow_pickle=True) for c in candidates]
+        groups = np.concatenate(parts) if len(parts) > 1 else parts[0]
+    except Exception as exc:  # noqa: BLE001
+        print(f"  Could not load group ids: {exc}")
+        return None
+
+    if keep_mask is not None and len(groups) == len(keep_mask):
+        groups = groups[keep_mask]
+
+    if len(groups) != n_expected:
+        print(f"  Group ids present but misaligned "
+              f"({len(groups)} vs {n_expected} windows) - ignoring.")
+        return None
+
+    return groups
 from sklearn.preprocessing import MultiLabelBinarizer
 from sklearn.decomposition import FastICA
 from sklearn.metrics import (
@@ -146,6 +179,12 @@ def parse_args():
     # --- Calibration ---
     parser.add_argument('--calibrate', action='store_true',
                         help='Post-training temperature scaling calibration on validation set')
+    parser.add_argument('--group-split', action='store_true',
+                        help='Split on source-recording groups so no recording '
+                             'spans train/val/test. Requires groups_*.npy from '
+                             'preprocessing. Strongly recommended: without it, '
+                             'near-duplicate windows leak across the split and '
+                             'reported F1 is optimistic.')
     # --- Grid parameters ---
     parser.add_argument('--mains-freq', type=float, default=60.0,
                         help='Mains grid frequency in Hz (default: 60 for PLAID/US; use 50 for Ghana/Europe)')
@@ -1265,10 +1304,62 @@ def main():
     # 2. Train/Val/Test split
     # ------------------------------------------------------------------
     print("\n[2/6] Splitting and composing mixtures...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_real, y_real, test_size=0.3, random_state=42, stratify=y_real)
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_test, y_test, test_size=0.7, random_state=42, stratify=y_test)
+
+    # SPLIT STRATEGY - read this before changing it.
+    #
+    # Preprocessing cuts each source recording into MANY consecutive 400-sample
+    # windows (prepare_*.py: `resampled[:n*W].reshape(n, W)`) and pools them by
+    # class, discarding which file each window came from. A plain
+    # train_test_split over those pooled windows therefore puts near-duplicate
+    # windows - same physical appliance, same recording session, milliseconds
+    # apart - on BOTH sides of the split. The held-out set is then not held out
+    # in any meaningful sense, and reported F1 is optimistic.
+    #
+    # `--group-split` fixes this properly by splitting on the group id emitted
+    # by preprocessing (see `groups` below), so every window from one recording
+    # lands wholly in train, val or test.
+    #
+    # It is opt-in only because group ids must be present in the data, and
+    # existing .npy corpora predate them. When they are missing we fall back to
+    # the old behaviour and say so loudly, because the difference shows up in
+    # the headline metric and would otherwise be invisible.
+    groups = load_groups(args.data_dir, len(X_real), keep_mask)
+
+    if args.group_split and groups is not None:
+        from sklearn.model_selection import GroupShuffleSplit
+
+        gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
+        train_idx, holdout_idx = next(gss.split(X_real, y_real, groups=groups))
+        X_train, y_train = X_real[train_idx], y_real[train_idx]
+        X_hold, y_hold, g_hold = X_real[holdout_idx], y_real[holdout_idx], groups[holdout_idx]
+
+        gss2 = GroupShuffleSplit(n_splits=1, test_size=0.7, random_state=42)
+        val_idx, test_idx = next(gss2.split(X_hold, y_hold, groups=g_hold))
+        X_val, y_val = X_hold[val_idx], y_hold[val_idx]
+        X_test, y_test = X_hold[test_idx], y_hold[test_idx]
+
+        n_groups = len(set(groups.tolist()))
+        print(f"  Split: GROUP-AWARE over {n_groups} source recordings.")
+        print(f"         No recording appears in more than one split.")
+    else:
+        if args.group_split:
+            print("  WARNING: --group-split requested but no group ids found in "
+                  f"{args.data_dir}.")
+            print("           Re-run preprocessing to emit groups_*.npy, or "
+                  "metrics will be")
+            print("           inflated by near-duplicate windows shared across "
+                  "splits.")
+        else:
+            print("  WARNING: random window-level split. Consecutive windows "
+                  "from the SAME")
+            print("           recording will appear in both train and test, so "
+                  "reported F1 is")
+            print("           optimistic. Use --group-split for an honest "
+                  "estimate.")
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_real, y_real, test_size=0.3, random_state=42, stratify=y_real)
+        X_val, X_test, y_val, y_test = train_test_split(
+            X_test, y_test, test_size=0.7, random_state=42, stratify=y_test)
 
     # Build source-level augmentor (train split only; val/test must stay clean)
     augmentor = None
@@ -1392,6 +1483,18 @@ def main():
             "signal_length": signal_length,
             "n_classes": n_classes,
             "model_version": args.model_version,
+            # Grid parameters MUST be persisted. FryzeDecomposition synthesises
+            # its reference voltage from these, and every constructor in
+            # fusion_resnet.py defaults them to 60 Hz / 120 V (PLAID/US). A
+            # checkpoint that does not carry them is silently rebuilt on the US
+            # grid at inference - for a fleet deployed in Ghana on 230 V / 50 Hz.
+            "mains_freq": args.mains_freq,
+            "mains_voltage": args.mains_volt,
+            # Provenance for the split used, so leakage characteristics of a
+            # given artifact are recoverable after the fact.
+            "split_strategy": (
+                "group_aware" if getattr(args, "group_split", False) else "random_window"
+            ),
         },
         start_epoch=start_epoch,
         best_val=best_val,
@@ -1467,6 +1570,31 @@ def main():
             Y_prob = cal_test_probs
             threshold = cal_threshold
             metrics = compute_all_metrics(Y_test, Y_pred, threshold, appliance_names)
+
+            # Write T and the calibrated threshold back into the checkpoint.
+            #
+            # Without this, calibration is fitted, reported to stdout, saved to
+            # a JSON file nothing reads, and then thrown away: inference_pipeline
+            # has no reference to TemperatureScaler at all, so it applies a raw
+            # sigmoid and reports uncalibrated confidences. Downstream
+            # temporal-smoothing thresholds (0.45/0.30) assume calibration that
+            # never happened.
+            fitted_t = float(getattr(scaler, "temperature", 1.0))
+            for ckpt_name in (
+                f"{args.model_version}_best.pt",
+                f"{args.model_version}_last.pt",
+            ):
+                ckpt_path = os.path.join(args.save_dir, ckpt_name)
+                if not os.path.exists(ckpt_path):
+                    continue
+                saved = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+                saved["calibration_temperature"] = fitted_t
+                saved["threshold"] = float(cal_threshold)
+                saved["calibration_ece_before"] = cal_metrics.get("ece_before")
+                saved["calibration_ece_after"] = cal_metrics.get("ece_after")
+                torch.save(saved, ckpt_path)
+                print(f"  Wrote calibration (T={fitted_t:.4f}, "
+                      f"threshold={cal_threshold:.4f}) into {ckpt_name}")
         except ImportError:
             print("  [skip] temperature_scaling.py not found")
 

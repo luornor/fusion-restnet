@@ -228,6 +228,14 @@ def main():
 
     # Process
     class_windows: dict[int, list[np.ndarray]] = defaultdict(list)
+    # Source-recording id per window, parallel to class_windows.
+    #
+    # Windows cut from one recording are near-duplicates: same physical
+    # appliance, same session, milliseconds apart. Training must keep them on
+    # one side of the train/test split, which is impossible once the file
+    # identity is discarded here - as it previously was. See
+    # train_fusion_resnet.py --group-split.
+    class_groups: dict[int, list[str]] = defaultdict(list)
     file_report: list[dict] = []
     total_files = 0
     total_windows = 0
@@ -250,6 +258,7 @@ def main():
                 continue
 
             class_windows[class_id].extend(windows)
+            class_groups[class_id].extend([fpath.stem] * len(windows))
             total_files += 1
             print(f"    {fpath.name}: {len(windows)} windows -> class {class_id}")
 
@@ -269,16 +278,24 @@ def main():
 
     # Cap per class
     print(f"\n[INFO] Capping at {args.max_windows_per_class} windows per class...")
-    X_parts, y_parts = [], []
+    X_parts, y_parts, g_parts = [], [], []
     class_map = {}
 
     for class_id in sorted(class_windows.keys()):
         wins = class_windows[class_id]
-        rng.shuffle(wins)
-        wins = wins[:args.max_windows_per_class]
+        grps = class_groups[class_id]
+        # Shuffle windows and their group ids TOGETHER; shuffling the windows
+        # alone would silently decouple each window from its recording.
+        # `rng` is a random.Random, so shuffle an index list rather than
+        # reaching for numpy's permutation.
+        order = list(range(len(wins)))
+        rng.shuffle(order)
+        wins = [wins[i] for i in order][:args.max_windows_per_class]
+        grps = [grps[i] for i in order][:args.max_windows_per_class]
         arr = np.stack(wins, axis=0)
         X_parts.append(arr)
         y_parts.append(np.full(len(arr), class_id, dtype=np.int64))
+        g_parts.append(np.array([f"whited:{g}" for g in grps], dtype=object))
         plaid_name = PLAID_CLASSES[class_id]
         class_map[class_id] = plaid_name
         total_windows += len(arr)
@@ -290,12 +307,13 @@ def main():
 
     X = np.concatenate(X_parts, axis=0).astype(np.float32)
     y = np.concatenate(y_parts, axis=0).astype(np.int64)
+    g = np.concatenate(g_parts, axis=0)
 
     print(f"\n[INFO] Final dataset: X={X.shape}  y={y.shape}  dtype={X.dtype}")
 
     # Validate
     assert X.ndim == 2 and X.shape[1] == WINDOW_SIZE, f"Bad shape: {X.shape}"
-    assert len(X) == len(y)
+    assert len(X) == len(y) == len(g)
     assert not np.isnan(X).any(), "NaN in X"
     assert not np.isinf(X).any(), "Inf in X"
     assert abs(X.mean()) < 1.0, f"Large global mean {X.mean():.4f} -- DC offset issue?"
@@ -303,8 +321,11 @@ def main():
     # Save
     np.save(x_out, X)
     np.save(y_out, y)
+    g_out = out_dir / "groups_whited.npy"
+    np.save(g_out, g)
     print(f"[OK] Saved: {x_out}  ({x_out.stat().st_size/1e6:.1f} MB)")
     print(f"[OK] Saved: {y_out}")
+    print(f"[OK] Saved: {g_out}  ({len(set(g.tolist()))} source recordings)")
 
     # Class map
     class_map_path = out_dir / "whited_class_map.json"

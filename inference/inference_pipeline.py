@@ -314,6 +314,123 @@ def load_preprocessed_features(input_path: str) -> tuple[dict[str, np.ndarray], 
 # Model Loading
 # ==============================================================================
 
+class CheckpointContractError(RuntimeError):
+    """The checkpoint does not carry what inference needs to be correct."""
+
+
+def resolve_threshold(ckpt: dict, checkpoint_path: str) -> float:
+    """Return the operating threshold, refusing to guess if it is missing.
+
+    This used to be `ckpt.get('threshold', 0.5)`. That default is not a
+    harmless fallback: this is a multi-label sigmoid model whose tuned
+    operating point for `multi-source-v1` is 0.2895, and whose own model
+    report states "the global threshold is far from 0.50". Running at 0.5
+    silently suppresses a large share of true detections, and nothing warns.
+
+    The shipped multi-source-v1 checkpoint has NO top-level `threshold` key -
+    its only `threshold` is 0.0001 inside the ReduceLROnPlateau scheduler
+    state, which is an unrelated quantity. Training now persists the real one
+    (see train_fusion_resnet.py), but older artifacts predate that.
+
+    Rather than default, fail with an actionable message. Pass --threshold to
+    override deliberately.
+    """
+    threshold = ckpt.get('threshold')
+    if threshold is not None:
+        return float(threshold)
+
+    raise CheckpointContractError(
+        f"Checkpoint '{checkpoint_path}' has no top-level 'threshold' key.\n"
+        f"\n"
+        f"  This model is multi-label; its decision threshold is tuned during\n"
+        f"  training and is NOT 0.5. Defaulting would silently change what the\n"
+        f"  model detects.\n"
+        f"\n"
+        f"  Fix one of:\n"
+        f"    * pass --threshold <value> explicitly (multi-source-v1 was\n"
+        f"      tuned to 0.2895 - see reports/figures/model_report_*.md)\n"
+        f"    * retrain, or re-save the checkpoint with its threshold\n"
+        f"      (train_fusion_resnet.py now persists it)"
+    )
+
+
+def _report_calibration(temperature) -> None:
+    """Say clearly whether probabilities are calibrated."""
+    if temperature is None:
+        print("  Calibration:       NONE (raw sigmoid probabilities)")
+        print("                     Confidence values are not calibrated. Any "
+              "downstream")
+        print("                     threshold that assumes calibrated "
+              "probabilities - including")
+        print("                     temporal smoothing on/off thresholds - is "
+              "operating on")
+        print("                     uncalibrated scores.")
+    else:
+        print(f"  Calibration:       temperature scaling T={float(temperature):.4f}")
+
+
+def export_ica_params(ica_params: dict, output_dir: str) -> str:
+    """Write the ICA/normalisation constants firmware must reproduce.
+
+    The split ("--preprocessed") path drops ICALayer and NormalizeLayer from
+    the model: `_PrecomputedSingleChannelBranch` contains neither. So firmware
+    must supply `ica_features` that are ALREADY projected through U/M AND
+    standardised by the training-set m/s. The README documents only
+    "ica_features: (N, 16)" and says nothing about standardisation, and this
+    pipeline used to load these four tensors and throw them away
+    (`model, threshold, ckpt, _ = load_split_model(...)`).
+
+    Exporting them makes the contract checkable instead of tribal knowledge.
+    """
+    path = os.path.join(output_dir, 'ica_params.npz')
+    np.savez(
+        path,
+        U=ica_params['U'],
+        M=ica_params['M'],
+        m=ica_params['m'],
+        s=ica_params['s'],
+    )
+    print(f"  Exported ICA constants for firmware -> {path}")
+    print( "    Firmware must compute: ica_features = (U @ (window - M) - m) / s")
+    return path
+
+
+def verify_preprocessed_features(features: dict, ica_params: dict) -> list[str]:
+    """Sanity-check hardware features against the checkpoint's expectations.
+
+    Returns a list of human-readable warnings (empty if everything looks
+    consistent). Catches the most likely firmware mistake: supplying raw ICA
+    projections that were never standardised, which leaves the ICA branch
+    seeing inputs far outside its training distribution.
+    """
+    warnings = []
+
+    ica = features.get('ica_features')
+    if ica is not None and ica.size:
+        mean_abs = float(np.abs(ica).mean())
+        std = float(ica.std())
+        # After standardisation these should be roughly zero-mean/unit-scale.
+        if std > 5.0 or mean_abs > 5.0:
+            warnings.append(
+                f"ica_features look un-standardised (mean|x|={mean_abs:.2f}, "
+                f"std={std:.2f}; expected ~1). Firmware must apply the m/s "
+                f"normalisation from the checkpoint, not just the U/M "
+                f"projection. See export_ica_params()."
+            )
+
+    raw = features.get('raw_window')
+    if raw is not None and raw.size:
+        peak = float(np.abs(raw).max())
+        if peak > 1.5:
+            warnings.append(
+                f"raw_window peak magnitude is {peak:.2f}; training normalises "
+                f"each window to unit magnitude, so values should be within "
+                f"[-1, 1]."
+            )
+
+    return warnings
+
+
 def load_model(checkpoint_path: str, variant: str, device: str,
                dtype: torch.dtype) -> tuple:
     """Load a trained Fusion-ResNet model from checkpoint.
@@ -336,6 +453,28 @@ def load_model(checkpoint_path: str, variant: str, device: str,
         'n_classes': n_classes,
         'signal_length': signal_length,
     }
+
+    # Grid parameters. FryzeDecomposition synthesises its reference voltage
+    # waveform from these, and EVERY constructor in fusion_resnet.py defaults
+    # them to 60 Hz / 120 V (PLAID/US). Rebuilding a model without them means
+    # the Fryze branch silently assumes a US grid - for a fleet deployed in
+    # Ghana at 230 V / 50 Hz, against a corpus that is itself mixed (PLAID
+    # 60 Hz, HIFDA/WHITED 50 Hz).
+    #
+    # Training now persists them. Older checkpoints do not, so warn rather
+    # than defaulting in silence.
+    mains_freq = ckpt.get('mains_freq')
+    mains_voltage = ckpt.get('mains_voltage')
+    if mains_freq is not None and mains_voltage is not None:
+        model_kwargs['mains_freq'] = float(mains_freq)
+        model_kwargs['mains_voltage'] = float(mains_voltage)
+        print(f"  Grid parameters:   {mains_freq} Hz / {mains_voltage} V (from checkpoint)")
+    else:
+        print("  WARNING: checkpoint does not record mains_freq/mains_voltage.")
+        print("           Falling back to the 60 Hz / 120 V library defaults, which")
+        print("           are WRONG for a 230 V / 50 Hz deployment. The Fryze branch")
+        print("           will see a mismatched reference voltage. Retrain, or")
+        print("           re-save the checkpoint with the grid it was trained on.")
     if has_ica:
         model_kwargs.update({
             'U': state_dict['ica_branch.ica.U'].cpu().numpy(),
@@ -356,11 +495,13 @@ def load_model(checkpoint_path: str, variant: str, device: str,
     model = model.to(device)
 
     model.load_state_dict(ckpt['model_state_dict'])
-    threshold = ckpt.get('threshold', 0.5)
+    threshold = resolve_threshold(ckpt, checkpoint_path)
+    temperature = ckpt.get('calibration_temperature')
     epoch = ckpt.get('epoch', '?')
     best_f1 = ckpt.get('best_val_f1', 'N/A')
 
     print(f"  Loaded checkpoint: epoch {epoch}, val F1 = {best_f1}")
+    _report_calibration(temperature)
 
     model.eval()
     return model, threshold, ckpt
@@ -372,11 +513,12 @@ def load_split_model(checkpoint_path: str, device: str,
     ckpt = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
     model, ica_params = build_split_model_from_full_checkpoint(
         ckpt, dtype=dtype, device=device)
-    threshold = ckpt.get('threshold', 0.5)
+    threshold = resolve_threshold(ckpt, checkpoint_path)
     epoch = ckpt.get('epoch', '?')
     best_f1 = ckpt.get('best_val_f1', 'N/A')
 
     print(f"  Loaded split checkpoint: epoch {epoch}, val F1 = {best_f1}")
+    _report_calibration(ckpt.get('calibration_temperature'))
     return model, threshold, ckpt, ica_params
 
 
@@ -384,10 +526,26 @@ def load_split_model(checkpoint_path: str, device: str,
 # Inference Engine
 # ==============================================================================
 
+def apply_temperature(logits: np.ndarray, temperature) -> np.ndarray:
+    """Scale logits by the fitted calibration temperature before sigmoid.
+
+    `calibrated_prob = sigmoid(logit / T)`. Without this, temperature scaling
+    fitted during training is written to a JSON file that nothing reads, and
+    inference reports raw uncalibrated confidences.
+    """
+    if temperature is None:
+        return logits
+    t = float(temperature)
+    if t <= 0:
+        return logits
+    return logits / t
+
+
 @torch.no_grad()
 def run_inference(model, windows: np.ndarray, threshold: float,
                   device: str, dtype: torch.dtype,
-                  batch_size: int = 256) -> tuple[np.ndarray, np.ndarray]:
+                  batch_size: int = 256,
+                  temperature=None) -> tuple[np.ndarray, np.ndarray]:
     """Run batched inference on pre-processed windows.
 
     Args:
@@ -408,6 +566,9 @@ def run_inference(model, windows: np.ndarray, threshold: float,
         batch = torch.tensor(
             windows[i:i + batch_size], dtype=dtype, device=device)
         logits = model(batch)
+        # Calibrate BEFORE the sigmoid: sigmoid(logit / T).
+        if temperature is not None:
+            logits = logits / float(temperature)
         probs = torch.sigmoid(logits).cpu().numpy()
         all_probs.append(probs)
 
@@ -419,7 +580,8 @@ def run_inference(model, windows: np.ndarray, threshold: float,
 
 def run_inference_preprocessed(model, feature_tensors: tuple,
                                threshold: float, device: str, dtype: torch.dtype,
-                               batch_size: int = 256) -> tuple[np.ndarray, np.ndarray]:
+                               batch_size: int = 256,
+                               temperature=None) -> tuple[np.ndarray, np.ndarray]:
     """Run inference on pre-processed features from ESP32.
 
     Args:
@@ -450,6 +612,9 @@ def run_inference_preprocessed(model, feature_tensors: tuple,
             ica_batch = ica_features[i:end_idx]
             logits = model(
                 raw_batch, fft_batch, fryze_a_batch, fryze_r_batch, ica_batch)
+            # Calibrate BEFORE the sigmoid: sigmoid(logit / T).
+            if temperature is not None:
+                logits = logits / float(temperature)
             probs = torch.sigmoid(logits).cpu().numpy()
             all_probs.append(probs)
 
@@ -895,15 +1060,27 @@ def main():
     # 3. Load model
     # ------------------------------------------------------------------
     print("\n[2/5] Loading model...")
+    ica_params = None
     if args.preprocessed:
-        model, ckpt_threshold, ckpt, _ = load_split_model(
+        model, ckpt_threshold, ckpt, ica_params = load_split_model(
             args.checkpoint, args.device, dtype)
     else:
         model, ckpt_threshold, ckpt = load_model(
             args.checkpoint, args.variant, args.device, dtype)
 
     threshold = args.threshold if args.threshold is not None else ckpt_threshold
-    print(f"  Using threshold: {threshold:.2f}")
+    # 4 dp, not 2: the tuned operating point for multi-source-v1 is 0.2895 and
+    # printing it as "0.29" hides exactly the precision that matters here.
+    print(f"  Using threshold: {threshold:.4f}"
+          + ("  (from --threshold)" if args.threshold is not None else "  (from checkpoint)"))
+
+    temperature = ckpt.get('calibration_temperature')
+
+    # Export the constants firmware must reproduce. These were previously
+    # loaded and discarded, leaving the hardware feature contract unverifiable.
+    if ica_params is not None:
+        os.makedirs(args.output, exist_ok=True)
+        export_ica_params(ica_params, args.output)
 
     # ------------------------------------------------------------------
     # 4. Load and preprocess input
@@ -924,6 +1101,15 @@ def main():
         feature_tensors = (raw_window, fft_magnitude, fryze_active, fryze_reactive, ica_features)
         n_windows = raw_window.shape[0]
         print(f"  Pre-processed features ready: {n_windows} windows")
+
+        # Check the hardware features against what the checkpoint expects.
+        # The split model contains no ICALayer/NormalizeLayer, so firmware
+        # must have applied BOTH the U/M projection and the m/s
+        # standardisation. Supplying un-standardised features is silent -
+        # the model just sees out-of-distribution input.
+        if ica_params is not None:
+            for warning in verify_preprocessed_features(features, ica_params):
+                print(f"  WARNING: {warning}")
     else:
         # Load raw signal and preprocess
         print(f"  Mains frequency: {args.mains_freq} Hz")
@@ -952,12 +1138,14 @@ def main():
     if args.preprocessed:
         # Inference on pre-processed features
         predictions, probabilities = run_inference_preprocessed(
-            model, feature_tensors, threshold, args.device, dtype, args.batch_size)
+            model, feature_tensors, threshold, args.device, dtype,
+            args.batch_size, temperature=temperature)
         windows = feature_tensors[0].cpu().numpy()  # For saving
     else:
         # Inference on raw windows
         predictions, probabilities = run_inference(
-            model, windows, threshold, args.device, dtype, args.batch_size)
+            model, windows, threshold, args.device, dtype, args.batch_size,
+            temperature=temperature)
     
     elapsed = time.time() - t0
 
