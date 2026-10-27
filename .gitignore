@@ -24,6 +24,10 @@ model_registry/*.pth
 # Combined dataset arrays — regenerate via: python preprocessing/merge_datasets.py
 data/combined/X_combined.npy
 data/combined/y_combined.npy
+data/combined*/X_combined.npy
+data/combined*/y_combined.npy
+data/combined*/groups_combined.npy
+data/combined*/sources_combined.npy
 
 # Natural recording waveforms — large raw signals (55 MB each), regenerate via:
 #   python preprocessing/prepare_natural.py --mat-dir ../Matlab_Data/Natural/...

@@ -1,0 +1,75 @@
+{
+  "source": "lilac",
+  "generated_at": "2026-10-27T19:35:28+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 2331,
+  "n_groups": 717,
+  "class_counts": {
+    "Coffee maker": 84,
+    "Fridge": 60,
+    "Hairdryer": 75,
+    "Heater": 363,
+    "Incandescent Light Bulb": 183,
+    "Vacuum": 82,
+    "Water kettle": 82,
+    "Single-phase induction motor": 144,
+    "Three-phase induction motor": 804,
+    "VSD-driven motor": 276,
+    "Fluorescent tube lighting": 90,
+    "Universal-motor tool": 88
+  },
+  "groups_per_class": {
+    "Coffee maker": 42,
+    "Fridge": 31,
+    "Hairdryer": 38,
+    "Heater": 91,
+    "Incandescent Light Bulb": 92,
+    "Vacuum": 41,
+    "Water kettle": 41,
+    "Single-phase induction motor": 72,
+    "Three-phase induction motor": 134,
+    "VSD-driven motor": 46,
+    "Fluorescent tube lighting": 45,
+    "Universal-motor tool": 44
+  },
+  "rms_a_median_per_class": {
+    "Coffee maker": 4.1751,
+    "Fridge": 5.1308,
+    "Hairdryer": 5.6166,
+    "Heater": 8.1465,
+    "Incandescent Light Bulb": 0.4147,
+    "Vacuum": 6.9821,
+    "Water kettle": 11.2845,
+    "Single-phase induction motor": 3.2386,
+    "Three-phase induction motor": 1.4825,
+    "VSD-driven motor": 0.8959,
+    "Fluorescent tube lighting": 0.4308,
+    "Universal-motor tool": 1.9551
+  },
+  "licence": "none stated",
+  "commercial_use": null,
+  "input": "..\\datasets_raw\\lilac_awrgnilm_preprocessed",
+  "subsets": [
+    "submetered",
+    "aggregated"
+  ],
+  "source_rate_hz": 50000,
+  "source_mains_hz": 50,
+  "retimed_to_50hz": false,
+  "bandwidth_hz": 1250,
+  "rotations_per_cycle": 1,
+  "skipped": {
+    "uncertain:Dumper-machine": 94,
+    "below_min_rms:Raclette": 3,
+    "below_min_rms:Refrigerator": 4,
+    "below_min_rms:Hair-dryer": 1,
+    "below_min_rms:Bulb": 1
+  },
+  "caveats": [
+    "One physical unit per LILAC appliance type: new classes seeded here will not generalise to other makes until field data is added.",
+    "Windows from one record are rotations of the same cycle, not independent observations. In the cycles time base each window is that cycle repeated 8 times.",
+    "Licence: none stated by LILAC. Do not ship a model trained on this without the authors' permission.",
+    "Resistor and Raclette are mapped to Heater as electrically equivalent resistive loads."
+  ]
+}

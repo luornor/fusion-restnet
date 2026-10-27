@@ -1,0 +1,15 @@
+{
+  "groups_written": true,
+  "sources_with_recording_ids": [
+    "plaid_v2",
+    "lilac",
+    "caffeine",
+    "kaist_hvac",
+    "nonlinear_loads"
+  ],
+  "sources_with_per_window_ids": [],
+  "sources_missing_ids": [],
+  "n_windows": 50189,
+  "n_groups": 1110,
+  "clean_group_split": true
+}

@@ -195,6 +195,9 @@ def main():
             zip_work[str(zpath)].append((scenario, cid, name, mtype))
 
     class_windows: dict[int, list[np.ndarray]] = defaultdict(list)
+    # Parallel to class_windows: the recording each window came from, for
+    # train_fusion_resnet.py --group-split.
+    class_groups: dict[int, list[str]] = defaultdict(list)
     total_files = 0
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -234,6 +237,7 @@ def main():
                         continue
 
                     class_windows[cid].extend(windows)
+                    class_groups[cid].extend([f"cooll:scenarioC1_{scenario}"] * len(windows))
                     total_files += 1
                     if total_files % 20 == 0:
                         print(f"  ... {total_files} files processed so far")
@@ -244,16 +248,22 @@ def main():
 
     # Cap per class and assemble
     print(f"\n[INFO] Capping at {args.max_windows_per_class} windows per class...")
-    X_parts, y_parts = [], []
+    X_parts, y_parts, g_parts = [], [], []
     class_map = {}
     total_windows = 0
 
     for cid in sorted(class_windows.keys()):
         wins = class_windows[cid]
-        random.shuffle(wins)
-        wins = wins[: args.max_windows_per_class]
-        arr = np.stack(wins, axis=0)
+        grps = class_groups[cid]
+        # Shuffle an index list so windows and group ids move together. A
+        # same-length shuffle draws the same randomness, so X is unchanged
+        # from the previous behaviour of shuffling `wins` in place.
+        order = list(range(len(wins)))
+        random.shuffle(order)
+        order = order[: args.max_windows_per_class]
+        arr = np.stack([wins[i] for i in order], axis=0)
         X_parts.append(arr)
+        g_parts.append(np.array([grps[i] for i in order], dtype=object))
         y_parts.append(np.full(len(arr), cid, dtype=np.int64))
         class_map[cid] = PLAID_CLASSES[cid]
         total_windows += len(arr)
@@ -265,6 +275,7 @@ def main():
 
     X = np.concatenate(X_parts, axis=0).astype(np.float32)
     y = np.concatenate(y_parts, axis=0).astype(np.int64)
+    g = np.concatenate(g_parts, axis=0)
 
     print(f"\n[INFO] Final: X={X.shape}  y={y.shape}  dtype={X.dtype}")
     assert not np.isnan(X).any() and not np.isinf(X).any()
@@ -272,6 +283,8 @@ def main():
 
     np.save(out_dir / "X_cooll.npy", X)
     np.save(out_dir / "y_cooll.npy", y)
+    np.save(out_dir / "groups_cooll.npy", g.astype(str))  # str, not object: loads without pickle
+    print(f"[OK] Saved: {out_dir}/groups_cooll.npy  ({len(set(g))} recordings)")
     print(f"[OK] Saved: {out_dir}/X_cooll.npy  ({(out_dir/'X_cooll.npy').stat().st_size/1e6:.1f} MB)")
 
     with open(out_dir / "cooll_class_map.json", "w") as f:
@@ -327,6 +340,13 @@ def main():
                 y_m = np.concatenate([y_ref, y], axis=0)
                 np.save(combined_dir / "X_combined.npy", X_m)
                 np.save(combined_dir / "y_combined.npy", y_m)
+                # This path writes no group ids, so any existing ones no longer
+                # line up with X_combined. Remove them rather than leave a file
+                # that would silently mis-split. Rebuild with merge_datasets.py.
+                stale = combined_dir / "groups_combined.npy"
+                if stale.exists():
+                    stale.unlink()
+                    print(f"[MERGE] Removed stale {stale}; run preprocessing/merge_datasets.py to rebuild group ids")
                 print(f"\n[MERGE] {rx_name}({X_ref.shape[0]:,}) + COOLL({X.shape[0]:,}) -> combined({X_m.shape[0]:,})")
                 break
 

@@ -48,6 +48,22 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingWarmResta
 from sklearn.model_selection import train_test_split
 
 
+def load_class_registry(path=None):
+    """Load preprocessing/class_registry.json, or None if it is absent."""
+    import json as _json
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                            'preprocessing', 'class_registry.json')
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding='utf-8') as f:
+        reg = _json.load(f)
+    ids = [c['id'] for c in reg['classes']]
+    if ids != list(range(len(ids))):
+        raise SystemExit(f"class_registry ids must be 0..N-1 in order, got {ids}")
+    return reg
+
+
 def load_groups(data_dir, n_expected, keep_mask=None):
     """Load per-window source-recording ids, if preprocessing emitted them.
 
@@ -174,11 +190,33 @@ def parse_args():
                         help='Max amplitude perturbation fraction (0=off; try 0.15)')
     parser.add_argument('--aug-phase-shift', action='store_true',
                         help='Random cyclic phase shift of source signatures')
+    parser.add_argument('--aug-bandlimit-prob', type=float, default=0.0,
+                        help='Probability of low-passing each training source signature at a '
+                             'random 2.5-12 kHz cutoff. Use when mixing low-rate sources '
+                             '(CAFFEINE 6.25 kHz, nonlinear_loads 7.7 kHz) so "no high band" '
+                             'cannot identify their classes (try 0.3)')
+    parser.add_argument('--current-prior', action='store_true',
+                        help='Rescale every source signature to a current drawn from its '
+                             "class's typical range in class_registry.json before mixing. "
+                             'Sources use different units (PLAID amps at 120 V, WHITED '
+                             'normalised, HIFDA/COOLL sensor volts), so without this the '
+                             'relative sizes of appliances in a mixture are arbitrary')
+    parser.add_argument('--class-registry', type=str, default=None,
+                        help='Path to class_registry.json (default: preprocessing/class_registry.json). '
+                             'Supplies class names when the data dir has no label encoder')
     parser.add_argument('--aug-time-warp', action='store_true',
                         help='Time-warping ±5%% on source signatures (optional; adds compute)')
     # --- Calibration ---
     parser.add_argument('--calibrate', action='store_true',
                         help='Post-training temperature scaling calibration on validation set')
+    parser.add_argument('--no-class-thresholds', action='store_true',
+                        help='Use one global decision threshold for every class '
+                             'instead of a per-class threshold fitted on the '
+                             'validation set.')
+    parser.add_argument('--min-class-samples', type=int, default=10,
+                        help='Drop classes with fewer real source windows than this '
+                             '(default 10). Hair Iron has only 15 real windows in '
+                             'the combined data; raise this to e.g. 100 to drop it.')
     parser.add_argument('--group-split', action='store_true',
                         help='Split on source-recording groups so no recording '
                              'spans train/val/test. Requires groups_*.npy from '
@@ -221,12 +259,16 @@ class SignatureAugmentor:
         amplitude_scale: float = 0.0,
         phase_shift: bool = False,
         time_warp: bool = False,
+        bandlimit_prob: float = 0.0,
+        sample_rate: float = 30_000.0,
         seed: int = 42,
     ):
         self.noise_sigma = noise_sigma
         self.amplitude_scale = amplitude_scale
         self.phase_shift = phase_shift
         self.time_warp = time_warp
+        self.bandlimit_prob = bandlimit_prob
+        self.sample_rate = sample_rate
         self._rng = np.random.RandomState(seed)
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
@@ -254,11 +296,21 @@ class SignatureAugmentor:
             )
             x = x_warped[:n] if new_n >= n else np.pad(x_warped, (0, n - new_n), mode='edge')
 
+        if self.bandlimit_prob > 0 and self._rng.rand() < self.bandlimit_prob:
+            # Low-rate sources (6-8 kHz) have nothing above 3-4 kHz. Removing
+            # the high band from random high-rate signatures too stops the
+            # model from learning "empty high band" as a class feature.
+            cutoff = self._rng.uniform(2_500.0, 12_000.0)
+            spec = np.fft.rfft(x)
+            freqs = np.fft.rfftfreq(len(x), 1.0 / self.sample_rate)
+            spec[freqs > cutoff] = 0
+            x = np.fft.irfft(spec, n=len(x))
+
         return x
 
     def is_active(self) -> bool:
         return (self.noise_sigma > 0 or self.amplitude_scale > 0
-                or self.phase_shift or self.time_warp)
+                or self.phase_shift or self.time_warp or self.bandlimit_prob > 0)
 
     def summary(self) -> str:
         parts = []
@@ -270,15 +322,20 @@ class SignatureAugmentor:
             parts.append('phase_shift=True')
         if self.time_warp:
             parts.append('time_warp=True')
+        if self.bandlimit_prob > 0:
+            parts.append(f'bandlimit_prob={self.bandlimit_prob}')
         return ', '.join(parts) if parts else 'none'
 
 
 class Composer:
     """Generates mixture signals from individual appliance signatures."""
 
-    def __init__(self, X, y, random_state=None, augmentor=None):
+    def __init__(self, X, y, random_state=None, augmentor=None, current_ranges=None):
         self._X = X
         self._y = y
+        # {class_id: (lo_a, hi_a)}: rescale each signature to a log-uniform RMS
+        # current in its class range before summing (see --current-prior).
+        self._current_ranges = current_ranges
         self._classes = np.unique(y)
         self._domains = {}
         for l in self._classes:
@@ -357,6 +414,12 @@ class Composer:
         Ii = np.asarray(Ii)
         x = self._X[Ii].copy()
         y = self._y[np.asarray(Ii)]
+        if self._current_ranges is not None:
+            for k, cls in enumerate(y):
+                lo, hi = self._current_ranges[int(cls)]
+                target = float(np.exp(self._rng.uniform(np.log(lo), np.log(hi))))
+                cur = float(np.sqrt(np.mean(x[k] ** 2))) + 1e-12
+                x[k] = x[k] * (target / cur)
         if self._augmentor is not None and self._augmentor.is_active():
             x = np.stack([self._augmentor(xi) for xi in x])
         x = np.sum(x, axis=0)
@@ -376,19 +439,36 @@ class Composer:
 
 
 def compose(X, y, n_classes, n_samples_per_component, n_min=1, n_max=None,
-            min_freqs=1, max_freqs=10, share=1.0, augmentor=None):
+            min_freqs=1, max_freqs=10, share=1.0, augmentor=None,
+            class_ids=None, split_name=None, current_ranges=None):
     """Generate mixture signals from individual signatures.
 
     Args:
         augmentor: Optional SignatureAugmentor applied to each source signature
                    before composition. Must be None for val/test data.
+        class_ids: The full, ordered list of kept class ids. Label columns are
+                   pinned to it, so column j always means the same appliance in
+                   every split. Without it, columns come from the classes that
+                   happen to be present; a group split that leaves a class out
+                   of val or test then shifts every later column and crashes.
     """
+    present = np.unique(y)
+    if class_ids is None:
+        class_ids = present
+    class_ids = [int(c) for c in class_ids]
+    missing = sorted(set(class_ids) - set(int(c) for c in present))
+    if missing:
+        print(f"  WARNING: {split_name or 'split'} has no source windows for class ids "
+              f"{missing}. Their metrics in this split are undefined. Collect more "
+              f"recordings for these classes, or drop them with --min-class-samples.")
     if n_max is None:
         n_max = n_classes
-    c = Composer(X, y, random_state=42, augmentor=augmentor)
+    c = Composer(X, y, random_state=42, augmentor=augmentor, current_ranges=current_ranges)
+    # A mixture cannot have more distinct appliances than the split contains.
+    n_max = min(n_max, c.n_classes)
     X_out = np.empty((0, X.shape[1]))
-    Y_out = np.empty((0, n_classes))
-    lenc = MultiLabelBinarizer(classes=np.unique(y))
+    Y_out = np.empty((0, len(class_ids)))
+    lenc = MultiLabelBinarizer(classes=class_ids)
     n_samples = round(share * n_samples_per_component)
 
     for n_comp in range(n_min, n_max + 1):
@@ -689,6 +769,56 @@ def compute_all_metrics(Y_true, Y_pred, threshold, appliance_names=None):
     return results
 
 
+def predict_logits(model, X, device, dtype, batch_size=256):
+    """Batched forward pass returning raw logits as a numpy array."""
+    model.eval()
+    out = []
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            batch = torch.tensor(X[i:i + batch_size], dtype=dtype, device=device)
+            out.append(model(batch).float().cpu().numpy())
+    return np.concatenate(out, axis=0)
+
+
+def fit_class_thresholds(Y_prob, Y_true, fallback, grid=None, min_positives=20):
+    """Pick, per class, the threshold that maximises that class's F1.
+
+    Fit on VALIDATION data only. One global threshold forces every appliance
+    onto the same operating point, and the multi-source-v1 report shows recall
+    far above precision for 14 of 15 classes: the global optimum suits none of
+    them individually. A class with fewer than `min_positives` positives in the
+    fitting set keeps `fallback`, because its per-class optimum would be noise.
+
+    Returns (thresholds, details): an (n_classes,) float array and a per-class
+    list of {threshold, val_f1, val_f1_at_fallback, positives, fitted}.
+    """
+    if grid is None:
+        grid = np.round(np.linspace(0.05, 0.95, 37), 4)
+    n_classes = Y_true.shape[1]
+    thresholds = np.full(n_classes, float(fallback), dtype=np.float64)
+    details = []
+    for c in range(n_classes):
+        y = Y_true[:, c].astype(int)
+        p = Y_prob[:, c]
+        positives = int(y.sum())
+        at_fallback = f1_score(y, (p >= fallback).astype(int), zero_division=0)
+        if positives < min_positives:
+            details.append({'threshold': float(fallback), 'val_f1': float(at_fallback),
+                            'val_f1_at_fallback': float(at_fallback),
+                            'positives': positives, 'fitted': False})
+            continue
+        scores = [f1_score(y, (p >= t).astype(int), zero_division=0) for t in grid]
+        best = int(np.argmax(scores))
+        # Keep the global value unless a per-class one is actually better.
+        if scores[best] > at_fallback:
+            thresholds[c] = float(grid[best])
+        details.append({'threshold': float(thresholds[c]),
+                        'val_f1': float(max(scores[best], at_fallback)),
+                        'val_f1_at_fallback': float(at_fallback),
+                        'positives': positives, 'fitted': True})
+    return thresholds, details
+
+
 def evaluate(model, X_test, Y_test, threshold, device, dtype, n_classes,
              appliance_names=None, batch_size=256):
     """Run full evaluation on test set with batched inference."""
@@ -820,6 +950,7 @@ def save_metrics_artifacts(metrics: dict, save_dir: str, model_version: str) -> 
             'precision': precision,
             'recall': recall,
             'support': int(values['support']),
+            'threshold': values.get('threshold', metrics.get('threshold')),
             'error_mode': error_mode,
         })
     per_class_path = os.path.join(save_dir, 'per_class_metrics.csv')
@@ -883,7 +1014,7 @@ def write_model_report(history: dict, metrics: dict, save_dir: str, model_versio
         recommendations.append(
             "Track the 2-5 active-appliance band separately; it is more deployment-relevant than the all-devices-on cases."
         )
-    if abs(float(metrics['threshold']) - 0.5) > 0.08:
+    if 'class_thresholds' not in metrics and abs(float(metrics['threshold']) - 0.5) > 0.08:
         recommendations.append(
             "Run calibration or class-specific threshold tuning before deployment; the global threshold is far from 0.50."
         )
@@ -1238,7 +1369,7 @@ def plot_summary_dashboard(history, metrics, save_dir='figures'):
 
 def generate_all_plots(history, metrics, save_dir='figures'):
     """Generate the core reporting plots for one model run."""
-    print(f"\nGenerating plots → {save_dir}/")
+    print(f"\nGenerating plots -> {save_dir}/")
     os.makedirs(save_dir, exist_ok=True)
 
     plot_training_curves(history, save_dir)
@@ -1273,11 +1404,22 @@ def main():
     # 1. Load data
     # ------------------------------------------------------------------
     print("\n[1/6] Loading data...")
-    X_real = np.load(f'{args.data_dir}/X_real.npy', allow_pickle=True)
-    y_real = np.load(f'{args.data_dir}/y_real.npy', allow_pickle=True)
+    # data/plaid ships X_real/y_real; data/combined (merge_datasets.py) ships
+    # X_combined/y_combined. Accept either so --data-dir data/combined works.
+    x_name, y_name = 'X_real.npy', 'y_real.npy'
+    if (not os.path.exists(f'{args.data_dir}/{x_name}')
+            and os.path.exists(f'{args.data_dir}/X_combined.npy')):
+        x_name, y_name = 'X_combined.npy', 'y_combined.npy'
+    print(f"  Data: {args.data_dir}/{x_name}")
+    X_real = np.load(f'{args.data_dir}/{x_name}', allow_pickle=True)
+    y_real = np.load(f'{args.data_dir}/{y_name}', allow_pickle=True)
 
-    # Try to load appliance names from label encoder
+    # Class names: label encoder if the data dir has one (data/plaid), else the
+    # class registry (data/combined*), else the original 16 PLAID names.
     appliance_names = DEFAULT_APPLIANCE_NAMES
+    registry = load_class_registry(args.class_registry)
+    if registry is not None:
+        appliance_names = [c['name'] for c in registry['classes']]
     lenc_path = f'{args.data_dir}/real_label_encoder.npy'
     if os.path.exists(lenc_path):
         try:
@@ -1286,15 +1428,32 @@ def main():
         except Exception:
             pass
 
-    # Drop rare classes (< 10 samples)
+    # Drop rare classes (fewer than --min-class-samples real windows)
     class_ids, counts = np.unique(y_real, return_counts=True)
-    kept_class_ids = [int(cls) for cls, count in zip(class_ids, counts) if count >= 10]
+    kept_class_ids = [int(cls) for cls, count in zip(class_ids, counts)
+                      if count >= args.min_class_samples]
+    dropped = [(int(cls), int(count)) for cls, count in zip(class_ids, counts)
+               if count < args.min_class_samples]
+    if dropped:
+        names = [f"{appliance_names[c] if c < len(appliance_names) else c} ({n})"
+                 for c, n in dropped]
+        print(f"  Dropping classes with < {args.min_class_samples} windows: {', '.join(names)}")
     keep_mask = np.isin(y_real, kept_class_ids)
     y_real = y_real[keep_mask]
     X_real = X_real[keep_mask]
 
     n_classes = len(np.unique(y_real))
     signal_length = X_real.shape[1]
+    if int(np.max(y_real)) >= len(appliance_names):
+        raise SystemExit(f"Label {int(np.max(y_real))} has no class name: {len(appliance_names)} "
+                         f"names known. Point --class-registry at the registry used to build the data.")
+
+    current_ranges = None
+    if args.current_prior:
+        if registry is None:
+            raise SystemExit("--current-prior needs class_registry.json (see --class-registry)")
+        current_ranges = {int(c['id']): tuple(c['current_rms_a']) for c in registry['classes']}
+        print("  Current prior: ON (signatures rescaled to registry current ranges before mixing)")
     appliance_names = [str(appliance_names[idx]) for idx in kept_class_ids]
     print(f"Classes: {n_classes} | Signal length: {signal_length} | "
           f"Samples: {len(X_real)}")
@@ -1326,21 +1485,27 @@ def main():
     groups = load_groups(args.data_dir, len(X_real), keep_mask)
 
     if args.group_split and groups is not None:
-        from sklearn.model_selection import GroupShuffleSplit
+        from sklearn.model_selection import StratifiedGroupKFold
 
-        gss = GroupShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
-        train_idx, holdout_idx = next(gss.split(X_real, y_real, groups=groups))
-        X_train, y_train = X_real[train_idx], y_real[train_idx]
-        X_hold, y_hold, g_hold = X_real[holdout_idx], y_real[holdout_idx], groups[holdout_idx]
-
-        gss2 = GroupShuffleSplit(n_splits=1, test_size=0.7, random_state=42)
-        val_idx, test_idx = next(gss2.split(X_hold, y_hold, groups=g_hold))
-        X_val, y_val = X_hold[val_idx], y_hold[val_idx]
-        X_test, y_test = X_hold[test_idx], y_hold[test_idx]
+        # Stratified, not plain GroupShuffleSplit: a plain group split ignores
+        # class balance, and with few recordings per class it routinely leaves
+        # whole appliances out of val or test. Ten folds keep the previous
+        # proportions: two folds test (~20%), one val (~10%), seven train.
+        sgkf = StratifiedGroupKFold(n_splits=10, shuffle=True, random_state=42)
+        fold_of = np.empty(len(y_real), dtype=int)
+        for fold, (_, idx) in enumerate(sgkf.split(X_real, y_real, groups=groups)):
+            fold_of[idx] = fold
+        test_mask = fold_of < 2
+        val_mask = fold_of == 2
+        train_mask = fold_of >= 3
+        X_train, y_train = X_real[train_mask], y_real[train_mask]
+        X_val, y_val = X_real[val_mask], y_real[val_mask]
+        X_test, y_test = X_real[test_mask], y_real[test_mask]
 
         n_groups = len(set(groups.tolist()))
-        print(f"  Split: GROUP-AWARE over {n_groups} source recordings.")
+        print(f"  Split: GROUP-AWARE (stratified) over {n_groups} source recordings.")
         print(f"         No recording appears in more than one split.")
+        print(f"         windows train/val/test: {train_mask.sum()}/{val_mask.sum()}/{test_mask.sum()}")
     else:
         if args.group_split:
             print("  WARNING: --group-split requested but no group ids found in "
@@ -1363,13 +1528,14 @@ def main():
 
     # Build source-level augmentor (train split only; val/test must stay clean)
     augmentor = None
-    if any([args.aug_noise_sigma > 0, args.aug_amplitude_scale > 0,
+    if any([args.aug_noise_sigma > 0, args.aug_amplitude_scale > 0, args.aug_bandlimit_prob > 0,
             args.aug_phase_shift, args.aug_time_warp]):
         augmentor = SignatureAugmentor(
             noise_sigma=args.aug_noise_sigma,
             amplitude_scale=args.aug_amplitude_scale,
             phase_shift=args.aug_phase_shift,
             time_warp=args.aug_time_warp,
+            bandlimit_prob=args.aug_bandlimit_prob,
             seed=args.seed,
         )
         print(f"  Source augmentation: {augmentor.summary()}")
@@ -1377,13 +1543,19 @@ def main():
     # Generate mixture signals (augmentor applied only to training data)
     X_train, Y_train = compose(
         X_train, y_train, n_classes, args.n_samples,
-        share=len(X_train) / len(X_real), augmentor=augmentor)
+        share=len(X_train) / len(X_real), augmentor=augmentor,
+        class_ids=kept_class_ids, split_name='train',
+        current_ranges=current_ranges)
     X_val, Y_val = compose(
         X_val, y_val, n_classes, args.n_samples,
-        share=len(X_val) / len(X_real))
+        share=len(X_val) / len(X_real),
+        class_ids=kept_class_ids, split_name='val',
+        current_ranges=current_ranges)
     X_test, Y_test = compose(
         X_test, y_test, n_classes, args.n_samples,
-        share=len(X_test) / len(X_real))
+        share=len(X_test) / len(X_real),
+        class_ids=kept_class_ids, split_name='test',
+        current_ranges=current_ranges)
 
     print(f"Train: {len(X_train)} | Val: {len(X_val)} | Test: {len(X_test)}")
 
@@ -1528,6 +1700,7 @@ def main():
     )
 
     # Post-training temperature scaling calibration
+    scaler = None
     if args.calibrate:
         print("\n  Running temperature scaling calibration on validation set...")
         try:
@@ -1550,11 +1723,12 @@ def main():
             cal_metrics = scaler.calibration_metrics(rep_logits, rep_labels)
 
             print(f"  Calibrated threshold: {cal_threshold:.4f} (was {threshold:.4f})")
-            print(f"  ECE: {cal_metrics['ece_before']:.4f} → {cal_metrics['ece_after']:.4f}")
+            print(f"  ECE: {cal_metrics['ece_before']:.4f} -> {cal_metrics['ece_after']:.4f}")
 
             import json as _json
             cal_metrics['calibrated_threshold'] = cal_threshold
             cal_metrics['uncalibrated_threshold'] = float(threshold)
+            os.makedirs(args.figures_dir, exist_ok=True)
             with open(os.path.join(args.figures_dir, 'calibration_metrics.json'), 'w') as f:
                 _json.dump(cal_metrics, f, indent=2)
             print(f"  Saved: {args.figures_dir}/calibration_metrics.json")
@@ -1597,6 +1771,59 @@ def main():
                       f"threshold={cal_threshold:.4f}) into {ckpt_name}")
         except ImportError:
             print("  [skip] temperature_scaling.py not found")
+
+    # Per-class decision thresholds, fitted on the validation set.
+    #
+    # Fitted AFTER calibration so they apply to the same probabilities the
+    # checkpoint's consumers will see. The test set is only scored here, never
+    # used to choose anything.
+    if not args.no_class_thresholds:
+        print("\n  Fitting per-class thresholds on the validation set...")
+        val_logits = predict_logits(model, X_val, args.device, dtype, args.batch_size)
+        if scaler is not None:
+            val_logits = scaler.scale(val_logits)
+        val_probs = 1.0 / (1.0 + np.exp(-val_logits))
+        class_thresholds, threshold_details = fit_class_thresholds(
+            val_probs, Y_val, fallback=float(threshold))
+
+        global_metrics = metrics
+        Y_pred = (Y_prob >= class_thresholds[None, :]).astype(int)
+        metrics = compute_all_metrics(Y_test, Y_pred, threshold, appliance_names)
+        metrics['class_thresholds'] = {
+            appliance_names[c]: float(class_thresholds[c]) for c in range(n_classes)
+        }
+        metrics['global_threshold_metrics'] = {
+            k: float(global_metrics[k]) for k in
+            ('f1_samples', 'f1_macro', 'precision_samples', 'recall_samples',
+             'accuracy', 'hamming_loss')
+        }
+        for c, name in enumerate(appliance_names):
+            metrics['per_class'][name]['threshold'] = float(class_thresholds[c])
+
+        print(f"  {'Appliance':<26} {'Thresh':>7} {'Val F1':>7} {'@global':>8}")
+        for c, name in enumerate(appliance_names):
+            d = threshold_details[c]
+            tag = '' if d['fitted'] else '  (too few positives; kept global)'
+            print(f"  {name:<26} {d['threshold']:>7.3f} {d['val_f1']:>7.4f} "
+                  f"{d['val_f1_at_fallback']:>8.4f}{tag}")
+        print(f"  Test F1 (samples): global {global_metrics['f1_samples']:.4f} -> "
+              f"per-class {metrics['f1_samples']:.4f}")
+        print(f"  Test precision (samples): global {global_metrics['precision_samples']:.4f} -> "
+              f"per-class {metrics['precision_samples']:.4f}")
+        print(f"  Test exact match: global {global_metrics['accuracy']:.4f} -> "
+              f"per-class {metrics['accuracy']:.4f}")
+
+        # Persist alongside the global threshold. Inference uses the per-class
+        # values when present; `threshold` stays for older consumers.
+        for ckpt_name in (f"{args.model_version}_best.pt", f"{args.model_version}_last.pt"):
+            ckpt_path = os.path.join(args.save_dir, ckpt_name)
+            if not os.path.exists(ckpt_path):
+                continue
+            saved = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+            saved["class_thresholds"] = [float(t) for t in class_thresholds]
+            saved["class_thresholds_fitted_on"] = "validation"
+            torch.save(saved, ckpt_path)
+            print(f"  Wrote per-class thresholds into {ckpt_name}")
 
     # Save probabilities used by the reported metrics.
     os.makedirs(args.figures_dir, exist_ok=True)

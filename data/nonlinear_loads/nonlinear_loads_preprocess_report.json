@@ -1,0 +1,75 @@
+{
+  "source": "nonlinear_loads",
+  "generated_at": "2026-10-27T19:36:58+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 19,
+  "n_groups": 5,
+  "class_counts": {
+    "Fridge": 4,
+    "Laptop": 4,
+    "Microwave": 3,
+    "Inverter air conditioner": 4,
+    "UPS": 4
+  },
+  "groups_per_class": {
+    "Fridge": 1,
+    "Laptop": 1,
+    "Microwave": 1,
+    "Inverter air conditioner": 1,
+    "UPS": 1
+  },
+  "rms_a_median_per_class": {
+    "Fridge": 1.8039,
+    "Laptop": 0.5047,
+    "Microwave": 13.5155,
+    "Inverter air conditioner": 2.3614,
+    "UPS": 1.5689
+  },
+  "licence": "CC BY 4.0",
+  "commercial_use": true,
+  "input": "..\\datasets_raw\\nonlinear_loads_mendeley_nkrhgfp9xy",
+  "source_rate_hz": 7667.8,
+  "source_mains_hz": 60.06,
+  "retimed_to_50hz": true,
+  "bandwidth_hz": 1500,
+  "window_hop": 50,
+  "workbooks": {
+    "AC_Inverter": {
+      "samples": 1533,
+      "rate_hz": 7667.8,
+      "seconds": 0.2,
+      "windows": 4
+    },
+    "UPS": {
+      "samples": 1533,
+      "rate_hz": 7667.8,
+      "seconds": 0.2,
+      "windows": 4
+    },
+    "Fridge": {
+      "samples": 1531,
+      "rate_hz": 7667.8,
+      "seconds": 0.2,
+      "windows": 4
+    },
+    "Microwave": {
+      "samples": 1532,
+      "rate_hz": 7667.8,
+      "seconds": 0.2,
+      "windows": 3
+    },
+    "Laptop_Charger": {
+      "samples": 1532,
+      "rate_hz": 7667.8,
+      "seconds": 0.2,
+      "windows": 4
+    }
+  },
+  "caveats": [
+    "Each class here is ONE ~0.2 s snapshot of ONE unit. Overlapping windows are near-duplicates.",
+    "Inverter air conditioner and UPS are seeds only. Do not report accuracy on them until field data exists.",
+    "~3.8 kHz source bandwidth: irrelevant in the cycles time base; with raw30k, train with --aug-bandlimit-prob.",
+    "Recorded on a 120/240 V 60 Hz grid; retimed to 50 Hz unless --no-retime."
+  ]
+}

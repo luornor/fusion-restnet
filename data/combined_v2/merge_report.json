@@ -1,0 +1,220 @@
+{
+  "sources": [
+    "plaid_v2",
+    "lilac",
+    "caffeine",
+    "kaist_hvac",
+    "nonlinear_loads"
+  ],
+  "timebase": "cycles",
+  "source_timebases": {
+    "plaid_v2": "cycles",
+    "lilac": "cycles",
+    "caffeine": "cycles",
+    "kaist_hvac": "cycles",
+    "nonlinear_loads": "cycles"
+  },
+  "missing_source_files": [],
+  "dropped_for_licence": [],
+  "licences": {
+    "plaid_v2": "CC BY 4.0",
+    "lilac": "none stated",
+    "caffeine": "CC BY 4.0",
+    "kaist_hvac": "CC BY 4.0",
+    "nonlinear_loads": "CC BY 4.0"
+  },
+  "per_class": {
+    "Air Conditioner": {
+      "windows": 6317,
+      "recordings": 22,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Blender": {
+      "windows": 6,
+      "recordings": 1,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Coffee maker": {
+      "windows": 114,
+      "recordings": 43,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Compact Fluorescent Lamp": {
+      "windows": 3304,
+      "recordings": 41,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Fan": {
+      "windows": 4391,
+      "recordings": 31,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Fridge": {
+      "windows": 2972,
+      "recordings": 63,
+      "sources": [
+        "lilac",
+        "nonlinear_loads",
+        "plaid_v2"
+      ]
+    },
+    "Hair Iron": {
+      "windows": 30,
+      "recordings": 1,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Hairdryer": {
+      "windows": 4186,
+      "recordings": 75,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Heater": {
+      "windows": 1871,
+      "recordings": 104,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Incandescent Light Bulb": {
+      "windows": 2840,
+      "recordings": 123,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Laptop": {
+      "windows": 4537,
+      "recordings": 42,
+      "sources": [
+        "nonlinear_loads",
+        "plaid_v2"
+      ]
+    },
+    "Microwave": {
+      "windows": 4620,
+      "recordings": 33,
+      "sources": [
+        "nonlinear_loads",
+        "plaid_v2"
+      ]
+    },
+    "Soldering Iron": {
+      "windows": 60,
+      "recordings": 1,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Vacuum": {
+      "windows": 1268,
+      "recordings": 57,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Washing Machine": {
+      "windows": 2783,
+      "recordings": 18,
+      "sources": [
+        "plaid_v2"
+      ]
+    },
+    "Water kettle": {
+      "windows": 112,
+      "recordings": 42,
+      "sources": [
+        "lilac",
+        "plaid_v2"
+      ]
+    },
+    "Single-phase induction motor": {
+      "windows": 144,
+      "recordings": 72,
+      "sources": [
+        "lilac"
+      ]
+    },
+    "Three-phase induction motor": {
+      "windows": 3504,
+      "recordings": 159,
+      "sources": [
+        "kaist_hvac",
+        "lilac"
+      ]
+    },
+    "VSD-driven motor": {
+      "windows": 276,
+      "recordings": 46,
+      "sources": [
+        "lilac"
+      ]
+    },
+    "Fluorescent tube lighting": {
+      "windows": 90,
+      "recordings": 45,
+      "sources": [
+        "lilac"
+      ]
+    },
+    "Universal-motor tool": {
+      "windows": 88,
+      "recordings": 44,
+      "sources": [
+        "lilac"
+      ]
+    },
+    "Espresso machine": {
+      "windows": 6668,
+      "recordings": 45,
+      "sources": [
+        "caffeine"
+      ]
+    },
+    "Inverter air conditioner": {
+      "windows": 4,
+      "recordings": 1,
+      "sources": [
+        "nonlinear_loads"
+      ]
+    },
+    "UPS": {
+      "windows": 4,
+      "recordings": 1,
+      "sources": [
+        "nonlinear_loads"
+      ]
+    }
+  },
+  "groups_written": true,
+  "sources_with_recording_ids": [
+    "plaid_v2",
+    "lilac",
+    "caffeine",
+    "kaist_hvac",
+    "nonlinear_loads"
+  ],
+  "sources_with_per_window_ids": [],
+  "sources_missing_ids": [],
+  "n_windows": 50189,
+  "n_groups": 1110,
+  "clean_group_split": true
+}

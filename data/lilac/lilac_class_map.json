@@ -1,0 +1,114 @@
+{
+  "Bulb": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Coffee-machine": {
+    "model_class": "Coffee maker",
+    "class_id": 2,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Hair-dryer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Kettle": {
+    "model_class": "Water kettle",
+    "class_id": 15,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Refrigerator": {
+    "model_class": "Fridge",
+    "class_id": 5,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Vacuum-cleaner": {
+    "model_class": "Vacuum",
+    "class_id": 13,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "1-phase-async-motor": {
+    "model_class": "Single-phase induction motor",
+    "class_id": 16,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "3-phase-async-motor": {
+    "model_class": "Three-phase induction motor",
+    "class_id": 17,
+    "status": "SAFE",
+    "three_phase": true,
+    "included": true
+  },
+  "Squirrel-3-async": {
+    "model_class": "Three-phase induction motor",
+    "class_id": 17,
+    "status": "SAFE",
+    "three_phase": true,
+    "included": true
+  },
+  "Squirrel-3-async-2x": {
+    "model_class": "Three-phase induction motor",
+    "class_id": 17,
+    "status": "SAFE",
+    "three_phase": true,
+    "included": true
+  },
+  "Freq-conv-squirrel-3-2x": {
+    "model_class": "VSD-driven motor",
+    "class_id": 18,
+    "status": "SAFE",
+    "three_phase": true,
+    "included": true
+  },
+  "Fluorescent-lamp": {
+    "model_class": "Fluorescent tube lighting",
+    "class_id": 19,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Drilling-machine": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "three_phase": false,
+    "included": true
+  },
+  "Resistor": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "three_phase": true,
+    "included": true
+  },
+  "Raclette": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "three_phase": false,
+    "included": true
+  },
+  "Dumper-machine": {
+    "model_class": "Three-phase induction motor",
+    "class_id": 17,
+    "status": "UNCERTAIN",
+    "three_phase": true,
+    "included": false
+  }
+}

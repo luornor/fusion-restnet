@@ -291,8 +291,13 @@ def build_class_map(hifda_current_dir: Path,
 
 def process_class(folder: Path, label_id: int, model_class: str,
                   max_files: int | None, max_windows_per_class: int | None,
-                  seed: int, verbose: bool) -> tuple[np.ndarray, np.ndarray, dict]:
-    """Process all .txt files in one HIFDA appliance folder."""
+                  seed: int, verbose: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """Process all .txt files in one HIFDA appliance folder.
+
+    Returns (X, y, groups, stats). `groups[i]` names the recording window i
+    was cut from, so training can keep a whole recording on one side of the
+    train/val/test split (see train_fusion_resnet.py --group-split).
+    """
     txt_files = sorted(folder.glob("*.txt"))
     if not txt_files:
         txt_files = sorted(folder.rglob("*.txt"))
@@ -300,6 +305,7 @@ def process_class(folder: Path, label_id: int, model_class: str,
     if not txt_files:
         return (np.empty((0, WINDOW_SIZE), dtype=np.float32),
                 np.empty(0, dtype=np.int64),
+                np.empty(0, dtype=object),
                 {"files_found": 0, "files_accepted": 0, "files_rejected": 0,
                  "windows": 0, "reject_reasons": {}})
 
@@ -308,6 +314,7 @@ def process_class(folder: Path, label_id: int, model_class: str,
         txt_files = rng.sample(txt_files, max_files)
 
     all_windows   = []
+    all_groups    = []
     accepted      = 0
     rejected      = 0
     reject_counts = defaultdict(int)
@@ -321,21 +328,26 @@ def process_class(folder: Path, label_id: int, model_class: str,
         else:
             accepted += 1
             all_windows.append(windows)
+            group_id = f"hifda:{folder.name}/{fpath.relative_to(folder).as_posix()}"
+            all_groups.extend([group_id] * len(windows))
 
     if not all_windows:
         return (np.empty((0, WINDOW_SIZE), dtype=np.float32),
                 np.empty(0, dtype=np.int64),
+                np.empty(0, dtype=object),
                 {"files_found": len(txt_files), "files_accepted": 0,
                  "files_rejected": rejected, "windows": 0,
                  "reject_reasons": dict(reject_counts)})
 
     X = np.concatenate(all_windows, axis=0)
+    groups = np.array(all_groups, dtype=object)
 
-    # Cap windows per class
+    # Cap windows per class. Index groups with the same idx so they stay aligned.
     if max_windows_per_class is not None and len(X) > max_windows_per_class:
         rng = np.random.default_rng(seed)
         idx = rng.choice(len(X), size=max_windows_per_class, replace=False)
-        X   = X[idx]
+        X      = X[idx]
+        groups = groups[idx]
 
     y = np.full(len(X), label_id, dtype=np.int64)
 
@@ -353,7 +365,7 @@ def process_class(folder: Path, label_id: int, model_class: str,
         print(f"    {model_class:<28} label={label_id:2d}  "
               f"files={accepted}/{len(txt_files)}  windows={len(X)}{uncertain_tag}")
 
-    return X, y, stats
+    return X, y, groups, stats
 
 
 # -----------------------------------------------------------------------------
@@ -687,7 +699,7 @@ def main():
 
     # -- 5. Process each active class -----------------------------------------
     print("[Processing HIFDA classes]")
-    all_X, all_y = [], []
+    all_X, all_y, all_g = [], [], []
     per_class_stats = {}
     class_map_out   = {}
 
@@ -705,7 +717,7 @@ def main():
             print(f"  WARNING: folder not found: {folder_path}")
             continue
 
-        X_cls, y_cls, stats = process_class(
+        X_cls, y_cls, g_cls, stats = process_class(
             folder         = folder_path,
             label_id       = info["label_id"],
             model_class    = info["model_class"],
@@ -719,6 +731,7 @@ def main():
         if len(X_cls) > 0:
             all_X.append(X_cls)
             all_y.append(y_cls)
+            all_g.append(g_cls)
 
     if not all_X:
         print("\nERROR: No windows extracted. "
@@ -727,11 +740,12 @@ def main():
 
     X_hifda = np.concatenate(all_X, axis=0).astype(np.float32)
     y_hifda = np.concatenate(all_y, axis=0).astype(np.int64)
+    g_hifda = np.concatenate(all_g, axis=0)
 
-    # Shuffle
+    # Shuffle windows and group ids with the same permutation.
     rng  = np.random.default_rng(args.seed)
     perm = rng.permutation(len(X_hifda))
-    X_hifda, y_hifda = X_hifda[perm], y_hifda[perm]
+    X_hifda, y_hifda, g_hifda = X_hifda[perm], y_hifda[perm], g_hifda[perm]
 
     print(f"\n[HIFDA summary]  {len(X_hifda)} windows  shape={X_hifda.shape}  "
           f"dtype={X_hifda.dtype}")
@@ -762,6 +776,9 @@ def main():
         else:
             np.save(x_out, X_hifda)
             np.save(y_out, y_hifda)
+            g_out = out_dir / "groups_hifda.npy"
+            np.save(g_out, g_hifda.astype(str))  # str, not object: loads without pickle
+            print(f"  Saved: {g_out}  ({len(set(g_hifda))} recordings)")
             print(f"\n  Saved: {x_out}  ({X_hifda.nbytes/1e6:.1f} MB)")
             print(f"  Saved: {y_out}")
 
@@ -816,6 +833,13 @@ def main():
                 else:
                     np.save(xc, X_combined)
                     np.save(yc, y_combined)
+                    # This path writes no group ids, so any existing ones no longer line up
+                    # with X_combined. Remove them rather than leave a file that would silently
+                    # mis-split. Rebuild group ids with preprocessing/merge_datasets.py.
+                    _stale = merge_out_dir / "groups_combined.npy"
+                    if _stale.exists():
+                        _stale.unlink()
+                        print(f"  Removed stale {_stale}; run preprocessing/merge_datasets.py to rebuild group ids")
                     print(f"  Saved: {xc}  ({X_combined.nbytes/1e6:.1f} MB)")
                     print(f"  Saved: {yc}")
 

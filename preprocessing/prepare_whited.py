@@ -322,7 +322,7 @@ def main():
     np.save(x_out, X)
     np.save(y_out, y)
     g_out = out_dir / "groups_whited.npy"
-    np.save(g_out, g)
+    np.save(g_out, g.astype(str))  # str, not object: loads without pickle
     print(f"[OK] Saved: {x_out}  ({x_out.stat().st_size/1e6:.1f} MB)")
     print(f"[OK] Saved: {y_out}")
     print(f"[OK] Saved: {g_out}  ({len(set(g.tolist()))} source recordings)")
@@ -419,6 +419,13 @@ def main():
                 y_merged = np.concatenate([y_ref, y], axis=0)
                 np.save(combined_dir / "X_combined.npy", X_merged)
                 np.save(combined_dir / "y_combined.npy", y_merged)
+                # This path writes no group ids, so any existing ones no longer line up
+                # with X_combined. Remove them rather than leave a file that would silently
+                # mis-split. Rebuild group ids with preprocessing/merge_datasets.py.
+                _stale = combined_dir / "groups_combined.npy"
+                if _stale.exists():
+                    _stale.unlink()
+                    print(f"  Removed stale {_stale}; run preprocessing/merge_datasets.py to rebuild group ids")
                 print(f"\n[MERGE] {ref_x_name} ({X_ref.shape[0]:,}) + WHITED ({X.shape[0]:,})"
                       f" -> combined ({X_merged.shape[0]:,})")
                 break

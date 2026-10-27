@@ -1,0 +1,7 @@
+{
+  "HVAC fan motor (D0-D4)": {
+    "model_class": "Three-phase induction motor",
+    "class_id": 17,
+    "status": "SAFE"
+  }
+}

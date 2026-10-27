@@ -1,0 +1,37 @@
+{
+  "source": "kaist_hvac",
+  "generated_at": "2026-10-27T19:35:58+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 2700,
+  "n_groups": 25,
+  "class_counts": {
+    "Three-phase induction motor": 2700
+  },
+  "groups_per_class": {
+    "Three-phase induction motor": 25
+  },
+  "rms_a_median_per_class": {
+    "Three-phase induction motor": 2.5183
+  },
+  "licence": "CC BY 4.0",
+  "commercial_use": true,
+  "input": "../datasets_raw/kaist_hvac_belt_mendeley_5tt3zb2pns/extracted",
+  "files": [
+    "Current_D0.tdms",
+    "Current_D1.tdms",
+    "Current_D2.tdms",
+    "Current_D3.tdms",
+    "Current_D4.tdms"
+  ],
+  "source_rate_hz": 100000,
+  "source_mains_hz": 60.0,
+  "retimed_to_50hz": true,
+  "bandwidth_hz": 1500,
+  "alignment": "current zero crossing shifted by an ASSUMED 37.0 deg lag (no voltage recorded)",
+  "caveats": [
+    "One physical motor (HVAC fan via belt). Adds diversity to the Three-phase induction motor class but is not a fleet.",
+    "Direct-on-line 60 Hz, 380 V class motor.",
+    "Belt levels D0-D4 are kept as groups, not classes. They are useful later for motor-health work (see docs/MCSA_PLAN.md)."
+  ]
+}

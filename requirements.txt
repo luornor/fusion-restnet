@@ -8,3 +8,10 @@ seaborn>=0.12.0
 timm>=0.9.0
 tqdm>=4.65.0
 
+
+# Preprocessing (preprocessing/prepare_*.py)
+scipy>=1.10.0
+soundfile>=0.12.0     # WHITED .flac
+pyarrow>=14.0.0       # CAFFEINE parquet
+nptdms>=1.7.0         # KAIST HVAC .tdms
+openpyxl>=3.1.0       # nonlinear_loads .xlsx

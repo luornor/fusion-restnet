@@ -1,0 +1,82 @@
+{
+  "Compact Fluorescent Lamp": {
+    "model_class": "Compact Fluorescent Lamp",
+    "class_id": 3,
+    "status": "SAFE"
+  },
+  "Fridge": {
+    "model_class": "Fridge",
+    "class_id": 5,
+    "status": "SAFE"
+  },
+  "Hairdryer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE"
+  },
+  "Air Conditioner": {
+    "model_class": "Air Conditioner",
+    "class_id": 0,
+    "status": "SAFE"
+  },
+  "Laptop": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "SAFE"
+  },
+  "Microwave": {
+    "model_class": "Microwave",
+    "class_id": 11,
+    "status": "SAFE"
+  },
+  "Vacuum": {
+    "model_class": "Vacuum",
+    "class_id": 13,
+    "status": "SAFE"
+  },
+  "Incandescent Light Bulb": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "SAFE"
+  },
+  "Fan": {
+    "model_class": "Fan",
+    "class_id": 4,
+    "status": "SAFE"
+  },
+  "Washing Machine": {
+    "model_class": "Washing Machine",
+    "class_id": 14,
+    "status": "SAFE"
+  },
+  "Heater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "SAFE"
+  },
+  "Coffee maker": {
+    "model_class": "Coffee maker",
+    "class_id": 2,
+    "status": "SAFE"
+  },
+  "Water kettle": {
+    "model_class": "Water kettle",
+    "class_id": 15,
+    "status": "SAFE"
+  },
+  "Hair Iron": {
+    "model_class": "Hair Iron",
+    "class_id": 6,
+    "status": "SAFE"
+  },
+  "Soldering Iron": {
+    "model_class": "Soldering Iron",
+    "class_id": 12,
+    "status": "SAFE"
+  },
+  "Blender": {
+    "model_class": "Blender",
+    "class_id": 1,
+    "status": "SAFE"
+  }
+}

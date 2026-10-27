@@ -1,0 +1,7 @@
+{
+  "espresso machine (all actuator states)": {
+    "model_class": "Espresso machine",
+    "class_id": 21,
+    "status": "SAFE"
+  }
+}

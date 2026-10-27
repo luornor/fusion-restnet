@@ -1,0 +1,44 @@
+{
+  "AC_Inverter": {
+    "model_class": "Inverter air conditioner",
+    "class_id": 22,
+    "status": "SAFE",
+    "included": true
+  },
+  "UPS": {
+    "model_class": "UPS",
+    "class_id": 23,
+    "status": "SAFE",
+    "included": true
+  },
+  "Fridge": {
+    "model_class": "Fridge",
+    "class_id": 5,
+    "status": "SAFE",
+    "included": true
+  },
+  "Microwave": {
+    "model_class": "Microwave",
+    "class_id": 11,
+    "status": "SAFE",
+    "included": true
+  },
+  "Laptop_Charger": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "SAFE",
+    "included": true
+  },
+  "TV_SONY": {
+    "model_class": null,
+    "class_id": null,
+    "status": "NO_CLASS",
+    "included": false
+  },
+  "Phone_Charger_Samsung": {
+    "model_class": null,
+    "class_id": null,
+    "status": "NO_CLASS",
+    "included": false
+  }
+}

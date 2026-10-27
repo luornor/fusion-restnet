@@ -1,0 +1,39 @@
+{
+  "source": "caffeine",
+  "generated_at": "2026-10-27T19:36:56+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 6668,
+  "n_groups": 45,
+  "class_counts": {
+    "Espresso machine": 6668
+  },
+  "groups_per_class": {
+    "Espresso machine": 45
+  },
+  "rms_a_median_per_class": {
+    "Espresso machine": 6.4538
+  },
+  "licence": "CC BY 4.0",
+  "commercial_use": true,
+  "input": "../datasets_raw/caffeine_zenodo_8105706/CAFFEINE_Dataset.zip",
+  "trials": 45,
+  "source_rate_hz": 6250,
+  "source_mains_hz": 50.0,
+  "retimed_to_50hz": false,
+  "bandwidth_hz": 1250,
+  "windows_per_operating_state": {
+    "grinder": 1125,
+    "heater": 953,
+    "heater+grinder": 963,
+    "heater+infuser": 366,
+    "heater+pump": 1125,
+    "infuser": 1011,
+    "pump": 1125
+  },
+  "caveats": [
+    "One physical machine: the Espresso machine class will not generalise to other makes until field data is added.",
+    "6.25 kHz source: nothing above 3.125 kHz. Irrelevant in the cycles time base (1.25 kHz cap); with raw30k, train with --aug-bandlimit-prob.",
+    "Labels are whole-machine. Component states are saved in states_caffeine.npy."
+  ]
+}

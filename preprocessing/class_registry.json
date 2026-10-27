@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "description": "Single source of truth for NILM class ids, per-class typical current, and per-source licensing. Ids 0-15 are the original PLAID label space and must never be renumbered: every existing .npy label and checkpoint depends on them. New classes are only ever appended.",
+  "nominal_voltage_v": 230,
+  "current_rms_note": "current_rms_a is the typical steady-state RMS current at 230 V, as an [min, max] range. These are engineering estimates for mixture realism (train_fusion_resnet.py --current-prior), not measurements. Refine them from field data.",
+  "classes": [
+    {"id": 0,  "name": "Air Conditioner",              "electrical_type": "compressor_motor", "current_rms_a": [2.5, 9.0],  "instances_public": "many",  "notes": "Fixed-speed split/window unit"},
+    {"id": 1,  "name": "Blender",                      "electrical_type": "universal_motor",  "current_rms_a": [1.2, 4.0],  "instances_public": "1-2",   "notes": "Too few samples; dropped by --min-class-samples"},
+    {"id": 2,  "name": "Coffee maker",                 "electrical_type": "resistive",        "current_rms_a": [3.0, 6.0],  "instances_public": "many",  "notes": "Drip/filter type. Espresso machines are class 21"},
+    {"id": 3,  "name": "Compact Fluorescent Lamp",     "electrical_type": "electronic_ballast","current_rms_a": [0.05, 0.2], "instances_public": "many",  "notes": ""},
+    {"id": 4,  "name": "Fan",                          "electrical_type": "small_motor",      "current_rms_a": [0.15, 0.6], "instances_public": "many",  "notes": "Domestic ceiling/standing fan"},
+    {"id": 5,  "name": "Fridge",                       "electrical_type": "compressor_motor", "current_rms_a": [0.4, 1.5],  "instances_public": "many",  "notes": "Domestic. Commercial refrigeration has no public waveform data"},
+    {"id": 6,  "name": "Hair Iron",                    "electrical_type": "resistive",        "current_rms_a": [0.1, 0.4],  "instances_public": "1-2",   "notes": "15 real windows only"},
+    {"id": 7,  "name": "Hairdryer",                    "electrical_type": "resistive_motor",  "current_rms_a": [3.0, 9.5],  "instances_public": "many",  "notes": ""},
+    {"id": 8,  "name": "Heater",                       "electrical_type": "resistive",        "current_rms_a": [4.0, 13.0], "instances_public": "many",  "notes": "Also the electrical stand-in for ovens, defrost heaters and resistor banks: the model is scale-invariant and cannot tell resistive loads apart by shape"},
+    {"id": 9,  "name": "Incandescent Light Bulb",      "electrical_type": "resistive",        "current_rms_a": [0.15, 0.45],"instances_public": "many",  "notes": ""},
+    {"id": 10, "name": "Laptop",                       "electrical_type": "smps",             "current_rms_a": [0.2, 0.8],  "instances_public": "many",  "notes": "Includes laptop chargers"},
+    {"id": 11, "name": "Microwave",                    "electrical_type": "transformer_magnetron","current_rms_a": [4.0, 7.5], "instances_public": "many",  "notes": ""},
+    {"id": 12, "name": "Soldering Iron",               "electrical_type": "resistive",        "current_rms_a": [0.1, 0.4],  "instances_public": "few",   "notes": ""},
+    {"id": 13, "name": "Vacuum",                       "electrical_type": "universal_motor",  "current_rms_a": [3.0, 9.0],  "instances_public": "many",  "notes": ""},
+    {"id": 14, "name": "Washing Machine",              "electrical_type": "mixed",            "current_rms_a": [0.4, 9.5],  "instances_public": "many",  "notes": "Motor phases and heater phases"},
+    {"id": 15, "name": "Water kettle",                 "electrical_type": "resistive",        "current_rms_a": [7.5, 13.0], "instances_public": "many",  "notes": ""},
+    {"id": 16, "name": "Single-phase induction motor", "electrical_type": "induction_motor",  "current_rms_a": [1.0, 10.0], "instances_public": "1",     "notes": "NEW. Proxy for water pumps, small compressors, mixers on capacitor-run motors. Seeded from one LILAC lab motor"},
+    {"id": 17, "name": "Three-phase induction motor",  "electrical_type": "induction_motor",  "current_rms_a": [1.0, 30.0], "instances_public": "4",     "notes": "NEW. One phase of a direct-on-line 3-phase motor, as a single-phase clamp sees it. Proxy for cold room compressors, AHU and condenser fans, pumps, conveyors. LILAC (3 machines) + KAIST HVAC fan motor"},
+    {"id": 18, "name": "VSD-driven motor",             "electrical_type": "vsd_rectifier",    "current_rms_a": [0.8, 30.0], "instances_public": "1",     "notes": "NEW. Mains side of a variable speed drive. The signature is the drive's rectifier, not the driven machine: pumps, conveyors and fans behind a VSD look alike. Seeded from one LILAC frequency converter"},
+    {"id": 19, "name": "Fluorescent tube lighting",    "electrical_type": "magnetic_ballast", "current_rms_a": [0.15, 0.8], "instances_public": "1",     "notes": "NEW. Tube fittings common in shops and offices. Seeded from one LILAC fitting"},
+    {"id": 20, "name": "Universal-motor tool",         "electrical_type": "universal_motor",  "current_rms_a": [1.5, 6.0],  "instances_public": "1",     "notes": "NEW. Drills, grinders, small food processors. Seeded from one LILAC drilling machine"},
+    {"id": 21, "name": "Espresso machine",             "electrical_type": "mixed",            "current_rms_a": [0.5, 7.0],  "instances_public": "1",     "notes": "NEW. Heater + vibration pump + grinder + infuser motor. Seeded from one CAFFEINE machine (6.25 kHz source)"},
+    {"id": 22, "name": "Inverter air conditioner",     "electrical_type": "inverter_compressor","current_rms_a": [1.5, 9.0], "instances_public": "1",    "notes": "NEW. One ~0.2 s snapshot of one unit (Mendeley nkrhgfp9xy). Seed only; needs field data"},
+    {"id": 23, "name": "UPS",                          "electrical_type": "smps_charger",     "current_rms_a": [0.3, 4.0],  "instances_public": "1",     "notes": "NEW. Line-interactive UPS on mains. One snapshot of one unit. Seed only; needs field data"}
+  ],
+  "sources": {
+    "plaid":           {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://figshare.com/articles/PLAID_2017/11605215",       "mains_hz": 60, "rate_hz": 30000,  "current_units": "A", "timebase": "cycles", "notes": "Legacy X_real.npy: no record ids, provenance undocumented. Superseded by plaid_v2"},
+    "plaid_v2":        {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://figshare.com/articles/dataset/10084619",          "mains_hz": 60, "rate_hz": 30000,  "current_units": "A", "timebase": "cycles", "notes": "Rebuilt from raw PLAID 2018 by prepare_plaid.py, appliance-instance groups"},
+    "hifda":           {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://zenodo.org/records/13884628",                     "mains_hz": 50, "rate_hz": 100000, "current_units": "sensor V (uncalibrated)", "timebase": "raw30k"},
+    "whited":          {"license": "none stated ('for research purposes')", "commercial_use": null, "url": "https://www.cs.cit.tum.de/dis/resources/whited/",     "mains_hz": 50, "rate_hz": 44100,  "current_units": "normalised per recording (no power information)", "timebase": "raw30k"},
+    "cooll":           {"license": "CC BY-NC 4.0",                      "commercial_use": false, "url": "https://coolldataset.github.io/",                        "mains_hz": 50, "rate_hz": 100000, "current_units": "uncalibrated", "timebase": "raw30k"},
+    "lilac":           {"license": "none stated",                       "commercial_use": null,  "url": "https://www.cs.cit.tum.de/dis/resources/lilacd/",        "mains_hz": 50, "rate_hz": 50000,  "current_units": "A"},
+    "caffeine":        {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://zenodo.org/records/8105706",                      "mains_hz": 50, "rate_hz": 6250,   "current_units": "A"},
+    "kaist_hvac":      {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://data.mendeley.com/datasets/5tt3zb2pns/1",         "mains_hz": 60, "rate_hz": 100000, "current_units": "A"},
+    "nonlinear_loads": {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://data.mendeley.com/datasets/nkrhgfp9xy/1",         "mains_hz": 60, "rate_hz": 7663,   "current_units": "A"}
+  }
+}

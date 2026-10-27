@@ -354,6 +354,24 @@ def resolve_threshold(ckpt: dict, checkpoint_path: str) -> float:
     )
 
 
+def resolve_class_thresholds(ckpt: dict, n_classes: int):
+    """Per-class thresholds from the checkpoint, or None if absent or malformed.
+
+    Training fits these on the validation set (train_fusion_resnet.py). They
+    take precedence over the single global `threshold`, which older
+    checkpoints carry alone.
+    """
+    values = ckpt.get('class_thresholds')
+    if values is None:
+        return None
+    arr = np.asarray(values, dtype=np.float64)
+    if arr.shape != (n_classes,) or not np.all(np.isfinite(arr)):
+        print(f"  Warning: checkpoint class_thresholds has shape {arr.shape}, "
+              f"expected ({n_classes},) - ignoring, using the global threshold")
+        return None
+    return arr
+
+
 def _report_calibration(temperature) -> None:
     """Say clearly whether probabilities are calibrated."""
     if temperature is None:
@@ -812,7 +830,7 @@ def print_results_summary(results: list[dict], appliance_names: list[str],
         # Show anomalies if present
         if 'anomalies' in result and result['anomalies']:
             for anomaly in result['anomalies']:
-                print(f"    ⚠️  [{anomaly['severity'].upper()}] {anomaly['anomaly_type']}: {anomaly['message']}")
+                print(f"    !!  [{anomaly['severity'].upper()}] {anomaly['anomaly_type']}: {anomaly['message']}")
 
     # Summary of anomalies
     total_anomalies = sum(len(r.get('anomalies', [])) for r in results)
@@ -1073,6 +1091,17 @@ def main():
     # printing it as "0.29" hides exactly the precision that matters here.
     print(f"  Using threshold: {threshold:.4f}"
           + ("  (from --threshold)" if args.threshold is not None else "  (from checkpoint)"))
+
+    # Per-class thresholds win over the global one unless --threshold was given
+    # explicitly. `probabilities >= threshold` broadcasts an (n_classes,) array
+    # across windows, so run_inference needs no other change.
+    if args.threshold is None:
+        n_ckpt_classes = ckpt.get('n_classes') or len(ckpt.get('appliance_names') or [])
+        class_thresholds = resolve_class_thresholds(ckpt, n_ckpt_classes) if n_ckpt_classes else None
+        if class_thresholds is not None:
+            threshold = class_thresholds
+            print(f"  Using per-class thresholds from checkpoint "
+                  f"(min {threshold.min():.4f}, max {threshold.max():.4f})")
 
     temperature = ckpt.get('calibration_temperature')
 
