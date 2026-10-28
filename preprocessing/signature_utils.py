@@ -136,7 +136,8 @@ def rising_zero_crossings(v: np.ndarray, rate: float, mains_hz: float) -> np.nda
 
 def zc_windows(current: np.ndarray, rate: float, mains_hz: float,
                voltage: np.ndarray | None = None, assumed_lag_deg: float = 0.0,
-               max_windows: int | None = None, step_cycles: int = CYCLES_PER_WINDOW) -> np.ndarray:
+               max_windows: int | None = None, step_cycles: int = CYCLES_PER_WINDOW,
+               channel_skew_deg: float = 0.0) -> np.ndarray:
     """Cycle-synchronous 400-sample windows aligned to the voltage rising zero crossing.
 
     Each window is the source current from one rising voltage zero crossing to
@@ -149,6 +150,11 @@ def zc_windows(current: np.ndarray, rate: float, mains_hz: float,
     That is an assumption; prefer real voltage whenever the source has it.
 
     step_cycles < 8 gives overlapping windows (for very short recordings).
+
+    channel_skew_deg: the current channel is recorded this many degrees late
+    against the voltage (an acquisition offset, measured on a resistive load).
+    The reference crossings move later by that amount; only the current is
+    cut, so the waveform itself is unchanged.
     """
     from scipy.signal import resample as fft_resample
     current = np.asarray(current, dtype=np.float64)
@@ -158,10 +164,14 @@ def zc_windows(current: np.ndarray, rate: float, mains_hz: float,
         # nonlinear_loads analyser): flip the current so its phase against
         # voltage is physical.
         n = min(len(current), len(voltage))
-        if float(np.mean(current[:n] * np.asarray(voltage[:n], dtype=np.float64))) < 0:
+        k = int(round(channel_skew_deg / 360.0 * rate / mains_hz))  # compare against de-skewed voltage
+        vv = np.asarray(voltage[:n - k] if k > 0 else voltage[:n], dtype=np.float64)
+        if float(np.nanmean(current[k:n] * vv)) < 0:
             current = -current
     ref = voltage if voltage is not None else current
     zc = rising_zero_crossings(ref, rate, mains_hz)
+    if channel_skew_deg:
+        zc = zc + (channel_skew_deg / 360.0) * (rate / mains_hz)
     if voltage is None and assumed_lag_deg:
         zc = zc - (assumed_lag_deg / 360.0) * (rate / mains_hz)
         zc = zc[zc >= 0]

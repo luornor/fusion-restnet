@@ -11,9 +11,12 @@ Run after the prepare_*.py scripts:
 Sources (in merge order; ids and licences come from preprocessing/class_registry.json):
     plaid           data/plaid/X_real.npy            PLAID, 60 Hz US       (legacy, no record ids)
     plaid_v2        data/plaid_v2/X_plaid_v2.npy     PLAID rebuilt from raw by prepare_plaid.py
-    hifda           data/hifda/X_hifda.npy           HIFDA, 50 Hz ES
-    whited          data/whited/X_whited.npy         WHITED, 50 Hz AT
-    cooll           data/cooll/X_cooll.npy           COOLL, 50 Hz FR       (CC BY-NC: not commercial)
+    hifda           data/hifda/X_hifda.npy           HIFDA, 50 Hz ES       (legacy raw30k)
+    hifda_v2        data/hifda_v2/X_hifda_v2.npy     HIFDA full-length records, voltage-aligned
+    whited          data/whited/X_whited.npy         WHITED, 50 Hz AT      (legacy raw30k, VOLTAGE channel)
+    whited_v2       data/whited_v2/X_whited_v2.npy   WHITED current channel, amps (licence unknown)
+    cooll           data/cooll/X_cooll.npy           COOLL, 50 Hz FR       (legacy raw30k; CC BY-NC: not commercial)
+    cooll_v2        data/cooll_v2/X_cooll_v2.npy     COOLL all 12 types, voltage-aligned, amps (CC BY-NC)
     lilac           data/lilac/X_lilac.npy           LILAC, 50 Hz DE       (licence unknown)
     caffeine        data/caffeine/X_caffeine.npy     CAFFEINE espresso, 50 Hz
     kaist_hvac      data/kaist_hvac/X_kaist_hvac.npy KAIST HVAC motor, 60->50 Hz
@@ -67,8 +70,11 @@ SOURCES = {
     "plaid":           ("data/plaid/X_real.npy", "data/plaid/y_real.npy", "data/plaid/groups_real.npy"),
     "plaid_v2":        ("data/plaid_v2/X_plaid_v2.npy", "data/plaid_v2/y_plaid_v2.npy", "data/plaid_v2/groups_plaid_v2.npy"),
     "hifda":           ("data/hifda/X_hifda.npy", "data/hifda/y_hifda.npy", "data/hifda/groups_hifda.npy"),
+    "hifda_v2":        ("data/hifda_v2/X_hifda_v2.npy", "data/hifda_v2/y_hifda_v2.npy", "data/hifda_v2/groups_hifda_v2.npy"),
     "whited":          ("data/whited/X_whited.npy", "data/whited/y_whited.npy", "data/whited/groups_whited.npy"),
+    "whited_v2":       ("data/whited_v2/X_whited_v2.npy", "data/whited_v2/y_whited_v2.npy", "data/whited_v2/groups_whited_v2.npy"),
     "cooll":           ("data/cooll/X_cooll.npy", "data/cooll/y_cooll.npy", "data/cooll/groups_cooll.npy"),
+    "cooll_v2":        ("data/cooll_v2/X_cooll_v2.npy", "data/cooll_v2/y_cooll_v2.npy", "data/cooll_v2/groups_cooll_v2.npy"),
     "lilac":           ("data/lilac/X_lilac.npy", "data/lilac/y_lilac.npy", "data/lilac/groups_lilac.npy"),
     "caffeine":        ("data/caffeine/X_caffeine.npy", "data/caffeine/y_caffeine.npy", "data/caffeine/groups_caffeine.npy"),
     "kaist_hvac":      ("data/kaist_hvac/X_kaist_hvac.npy", "data/kaist_hvac/y_kaist_hvac.npy", "data/kaist_hvac/groups_kaist_hvac.npy"),
@@ -76,7 +82,7 @@ SOURCES = {
 }
 ORIGINAL = ["plaid", "hifda", "whited", "cooll"]
 # A source listed here is dropped from "all" when its replacement exists.
-SUPERSEDED_BY = {"plaid": "plaid_v2"}
+SUPERSEDED_BY = {"plaid": "plaid_v2", "hifda": "hifda_v2", "whited": "whited_v2", "cooll": "cooll_v2"}
 
 
 def source_timebase(name: str, root: Path, reg: dict) -> str | None:

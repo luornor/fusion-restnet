@@ -1,0 +1,236 @@
+{
+  "AC": {
+    "model_class": "Air Conditioner",
+    "class_id": 0,
+    "status": "SAFE",
+    "note": ""
+  },
+  "CFL": {
+    "model_class": "Compact Fluorescent Lamp",
+    "class_id": 3,
+    "status": "SAFE",
+    "note": ""
+  },
+  "CoffeeMachine": {
+    "model_class": "Coffee maker",
+    "class_id": 2,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Fan": {
+    "model_class": "Fan",
+    "class_id": 4,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Fridge": {
+    "model_class": "Fridge",
+    "class_id": 5,
+    "status": "SAFE",
+    "note": "Canadian 115 V unit"
+  },
+  "FlatIron": {
+    "model_class": "Hair Iron",
+    "class_id": 6,
+    "status": "SAFE",
+    "note": "flat iron = hair straightener"
+  },
+  "HairDryer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Hairdryer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Heater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Kettle": {
+    "model_class": "Water kettle",
+    "class_id": 15,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Laptop": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "SAFE",
+    "note": ""
+  },
+  "LightBulb": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Microwave": {
+    "model_class": "Microwave",
+    "class_id": 11,
+    "status": "SAFE",
+    "note": ""
+  },
+  "SolderingIron": {
+    "model_class": "Soldering Iron",
+    "class_id": 12,
+    "status": "SAFE",
+    "note": ""
+  },
+  "VacuumCleaner": {
+    "model_class": "Vacuum",
+    "class_id": 13,
+    "status": "SAFE",
+    "note": ""
+  },
+  "DrillingMachine": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": ""
+  },
+  "JigSaw": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": ""
+  },
+  "MultiTool": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "rotary tool"
+  },
+  "BenchGrinder": {
+    "model_class": "Single-phase induction motor",
+    "class_id": 16,
+    "status": "EQUIVALENT",
+    "note": "THD 0.03, PF 0.92: induction, not universal"
+  },
+  "Halogen": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "EQUIVALENT",
+    "note": "halogen is incandescent"
+  },
+  "HalogenFluter": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "EQUIVALENT",
+    "note": "300 W halogen"
+  },
+  "Mixer": {
+    "model_class": "Blender",
+    "class_id": 1,
+    "status": "EQUIVALENT",
+    "note": "universal-motor kitchen appliance"
+  },
+  "JuiceMaker": {
+    "model_class": "Blender",
+    "class_id": 1,
+    "status": "EQUIVALENT",
+    "note": "universal-motor kitchen appliance"
+  },
+  "SewingMachine": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "EQUIVALENT",
+    "note": "universal motor"
+  },
+  "Iron": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "clothes iron, resistive (PF 1.00)"
+  },
+  "WaterHeater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive (PF 1.00)"
+  },
+  "FanHeater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive plus small fan (PF 1.00)"
+  },
+  "DeepFryer": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive (PF 1.00)"
+  },
+  "Toaster": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive (PF 1.00)"
+  },
+  "SandwichMaker": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive (PF 1.00)"
+  },
+  "RiceCooker": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive (PF 1.00)"
+  },
+  "Stove": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive hotplate (PF 1.00)"
+  },
+  "WaterPump": {
+    "model_class": "Single-phase induction motor",
+    "class_id": 16,
+    "status": "UNCERTAIN",
+    "note": "Grundfos circulator, PF 0.97: may be an electronic (ECM) drive"
+  },
+  "KitchenHood": {
+    "model_class": "Fan",
+    "class_id": 4,
+    "status": "UNCERTAIN",
+    "note": "fan motor, PF 0.56"
+  },
+  "WashingMachine": {
+    "model_class": "Washing Machine",
+    "class_id": 14,
+    "status": "UNCERTAIN",
+    "note": "5 s from switch-on is only the inlet valve and electronics (0.11 A, PF 0.27)"
+  },
+  "Treadmill": {
+    "model_class": "VSD-driven motor",
+    "class_id": 18,
+    "status": "UNCERTAIN",
+    "note": "rectifier-fed DC motor drive"
+  },
+  "DesktopPC": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS with PFC"
+  },
+  "Monitor": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  },
+  "Charger": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  }
+}

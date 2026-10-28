@@ -119,9 +119,13 @@ A window is 400 samples, and the repo has used two incompatible conventions:
 `data/combined` and the shipped model mix both conventions, so every mixture
 that combines PLAID with another source adds a 133 ms window to a 13 ms one.
 New data uses **cycles**, and `merge_datasets.py` refuses to mix time bases.
-HIFDA, WHITED and COOLL stay out of the new sets until their scripts cut
-voltage-aligned cycle windows. `signature_utils.zc_windows` does that given
-the voltage channel.
+HIFDA, WHITED and COOLL are rebuilt in this time base by their `_v2`
+scripts, which replace the legacy sources in a default merge.
+
+The legacy `prepare_whited.py` reads FLAC channel 0 as current. Channel 0
+is the **voltage**, so `data/whited` and every model trained on it learned
+mains voltage as the WHITED signatures. `prepare_whited_v2.py` reads
+channel 1.
 
 Inference on raw signals (`segment_continuous_signal`) resamples **10** cycles
 into 400 samples, 40 per cycle. Neither PLAID nor the Fryze branch uses that.
@@ -136,6 +140,9 @@ python preprocessing/prepare_lilac.py            # LILAC lab industrial loads
 python preprocessing/prepare_caffeine.py         # CAFFEINE espresso machine
 python preprocessing/prepare_kaist_hvac.py       # KAIST HVAC three-phase fan motor
 python preprocessing/prepare_nonlinear_loads.py  # inverter AC, UPS snapshots
+python preprocessing/prepare_hifda_v2.py         # HIFDA full-length records with voltage (2025 version)
+python preprocessing/prepare_whited_v2.py        # WHITED current channel in amps, instance groups
+python preprocessing/prepare_cooll_v2.py         # COOLL all 12 types incl. 24 power tools (CC BY-NC)
 
 # 2. Merge. Default: every cycles-time-base source, plaid_v2 in place of legacy plaid.
 python preprocessing/merge_datasets.py --out-dir data/combined_v2
