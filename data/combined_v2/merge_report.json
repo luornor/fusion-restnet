@@ -1,6 +1,9 @@
 {
   "sources": [
     "plaid_v2",
+    "hifda_v2",
+    "whited_v2",
+    "cooll_v2",
     "lilac",
     "caffeine",
     "kaist_hvac",
@@ -9,6 +12,9 @@
   "timebase": "cycles",
   "source_timebases": {
     "plaid_v2": "cycles",
+    "hifda_v2": "cycles",
+    "whited_v2": "cycles",
+    "cooll_v2": "cycles",
     "lilac": "cycles",
     "caffeine": "cycles",
     "kaist_hvac": "cycles",
@@ -18,6 +24,9 @@
   "dropped_for_licence": [],
   "licences": {
     "plaid_v2": "CC BY 4.0",
+    "hifda_v2": "CC BY 4.0",
+    "whited_v2": "none stated ('for research purposes')",
+    "cooll_v2": "CC BY-NC 4.0",
     "lilac": "none stated",
     "caffeine": "CC BY 4.0",
     "kaist_hvac": "CC BY 4.0",
@@ -25,110 +34,135 @@
   },
   "per_class": {
     "Air Conditioner": {
-      "windows": 6317,
-      "recordings": 22,
+      "windows": 6437,
+      "recordings": 23,
       "sources": [
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Blender": {
-      "windows": 6,
-      "recordings": 1,
+      "windows": 606,
+      "recordings": 6,
       "sources": [
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Coffee maker": {
-      "windows": 114,
-      "recordings": 43,
+      "windows": 954,
+      "recordings": 51,
       "sources": [
+        "hifda_v2",
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Compact Fluorescent Lamp": {
-      "windows": 3304,
-      "recordings": 41,
+      "windows": 3704,
+      "recordings": 44,
       "sources": [
-        "plaid_v2"
+        "cooll_v2",
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Fan": {
-      "windows": 4391,
-      "recordings": 31,
+      "windows": 5431,
+      "recordings": 39,
       "sources": [
-        "plaid_v2"
+        "cooll_v2",
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Fridge": {
-      "windows": 2972,
-      "recordings": 63,
+      "windows": 3092,
+      "recordings": 64,
       "sources": [
         "lilac",
         "nonlinear_loads",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Hair Iron": {
-      "windows": 30,
-      "recordings": 1,
+      "windows": 270,
+      "recordings": 3,
       "sources": [
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Hairdryer": {
-      "windows": 4186,
-      "recordings": 75,
+      "windows": 6418,
+      "recordings": 93,
       "sources": [
+        "cooll_v2",
+        "hifda_v2",
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Heater": {
-      "windows": 1871,
-      "recordings": 104,
+      "windows": 6191,
+      "recordings": 143,
       "sources": [
+        "hifda_v2",
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Incandescent Light Bulb": {
-      "windows": 2840,
-      "recordings": 123,
+      "windows": 4240,
+      "recordings": 134,
       "sources": [
+        "cooll_v2",
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Laptop": {
-      "windows": 4537,
-      "recordings": 42,
+      "windows": 5377,
+      "recordings": 50,
       "sources": [
+        "hifda_v2",
         "nonlinear_loads",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Microwave": {
-      "windows": 4620,
-      "recordings": 33,
+      "windows": 5580,
+      "recordings": 42,
       "sources": [
+        "hifda_v2",
         "nonlinear_loads",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Soldering Iron": {
-      "windows": 60,
-      "recordings": 1,
+      "windows": 300,
+      "recordings": 3,
       "sources": [
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Vacuum": {
-      "windows": 1268,
-      "recordings": 57,
+      "windows": 3468,
+      "recordings": 74,
       "sources": [
+        "cooll_v2",
+        "hifda_v2",
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Washing Machine": {
@@ -139,18 +173,20 @@
       ]
     },
     "Water kettle": {
-      "windows": 112,
-      "recordings": 42,
+      "windows": 1180,
+      "recordings": 51,
       "sources": [
         "lilac",
-        "plaid_v2"
+        "plaid_v2",
+        "whited_v2"
       ]
     },
     "Single-phase induction motor": {
-      "windows": 144,
-      "recordings": 72,
+      "windows": 264,
+      "recordings": 73,
       "sources": [
-        "lilac"
+        "lilac",
+        "whited_v2"
       ]
     },
     "Three-phase induction motor": {
@@ -176,10 +212,12 @@
       ]
     },
     "Universal-motor tool": {
-      "windows": 88,
-      "recordings": 44,
+      "windows": 4528,
+      "recordings": 73,
       "sources": [
-        "lilac"
+        "cooll_v2",
+        "lilac",
+        "whited_v2"
       ]
     },
     "Espresso machine": {
@@ -207,6 +245,9 @@
   "groups_written": true,
   "sources_with_recording_ids": [
     "plaid_v2",
+    "hifda_v2",
+    "whited_v2",
+    "cooll_v2",
     "lilac",
     "caffeine",
     "kaist_hvac",
@@ -214,7 +255,7 @@
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 50189,
-  "n_groups": 1110,
+  "n_windows": 71369,
+  "n_groups": 1281,
   "clean_group_split": true
 }

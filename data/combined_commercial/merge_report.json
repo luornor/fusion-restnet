@@ -1,6 +1,7 @@
 {
   "sources": [
     "plaid_v2",
+    "hifda_v2",
     "caffeine",
     "kaist_hvac",
     "nonlinear_loads"
@@ -8,16 +9,20 @@
   "timebase": "cycles",
   "source_timebases": {
     "plaid_v2": "cycles",
+    "hifda_v2": "cycles",
     "caffeine": "cycles",
     "kaist_hvac": "cycles",
     "nonlinear_loads": "cycles"
   },
   "missing_source_files": [],
   "dropped_for_licence": [
+    "whited_v2",
+    "cooll_v2",
     "lilac"
   ],
   "licences": {
     "plaid_v2": "CC BY 4.0",
+    "hifda_v2": "CC BY 4.0",
     "caffeine": "CC BY 4.0",
     "kaist_hvac": "CC BY 4.0",
     "nonlinear_loads": "CC BY 4.0"
@@ -38,9 +43,10 @@
       ]
     },
     "Coffee maker": {
-      "windows": 30,
-      "recordings": 1,
+      "windows": 630,
+      "recordings": 7,
       "sources": [
+        "hifda_v2",
         "plaid_v2"
       ]
     },
@@ -74,16 +80,18 @@
       ]
     },
     "Hairdryer": {
-      "windows": 4111,
-      "recordings": 37,
+      "windows": 4711,
+      "recordings": 43,
       "sources": [
+        "hifda_v2",
         "plaid_v2"
       ]
     },
     "Heater": {
-      "windows": 1508,
-      "recordings": 13,
+      "windows": 3308,
+      "recordings": 31,
       "sources": [
+        "hifda_v2",
         "plaid_v2"
       ]
     },
@@ -95,17 +103,19 @@
       ]
     },
     "Laptop": {
-      "windows": 4537,
-      "recordings": 42,
+      "windows": 5137,
+      "recordings": 48,
       "sources": [
+        "hifda_v2",
         "nonlinear_loads",
         "plaid_v2"
       ]
     },
     "Microwave": {
-      "windows": 4620,
-      "recordings": 33,
+      "windows": 5220,
+      "recordings": 39,
       "sources": [
+        "hifda_v2",
         "nonlinear_loads",
         "plaid_v2"
       ]
@@ -118,9 +128,10 @@
       ]
     },
     "Vacuum": {
-      "windows": 1186,
-      "recordings": 16,
+      "windows": 1786,
+      "recordings": 22,
       "sources": [
+        "hifda_v2",
         "plaid_v2"
       ]
     },
@@ -170,13 +181,14 @@
   "groups_written": true,
   "sources_with_recording_ids": [
     "plaid_v2",
+    "hifda_v2",
     "caffeine",
     "kaist_hvac",
     "nonlinear_loads"
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 47858,
-  "n_groups": 393,
+  "n_windows": 52658,
+  "n_groups": 441,
   "clean_group_split": true
 }

@@ -1,0 +1,104 @@
+{
+  "source": "cooll_v2",
+  "generated_at": "2026-10-28T12:40:08+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 6560,
+  "n_groups": 41,
+  "class_counts": {
+    "Compact Fluorescent Lamp": 160,
+    "Fan": 320,
+    "Hairdryer": 800,
+    "Incandescent Light Bulb": 320,
+    "Vacuum": 1120,
+    "Universal-motor tool": 3840
+  },
+  "groups_per_class": {
+    "Compact Fluorescent Lamp": 1,
+    "Fan": 2,
+    "Hairdryer": 5,
+    "Incandescent Light Bulb": 2,
+    "Vacuum": 7,
+    "Universal-motor tool": 24
+  },
+  "rms_a_median_per_class": {
+    "Compact Fluorescent Lamp": 0.1068,
+    "Fan": 0.1718,
+    "Hairdryer": 6.3548,
+    "Incandescent Light Bulb": 0.4325,
+    "Vacuum": 5.6375,
+    "Universal-motor tool": 1.2439
+  },
+  "licence": "CC BY-NC 4.0",
+  "commercial_use": false,
+  "input": "..\\datasets_raw\\cooll_gdrive",
+  "source_rate_hz": 100000,
+  "source_mains_hz": 50.0,
+  "retimed_to_50hz": false,
+  "bandwidth_hz": 1250,
+  "alignment": "voltage rising zero crossing",
+  "units": "A, via scaleFactors.txt",
+  "include_uncertain": false,
+  "units_per_class": {
+    "Universal-motor tool": [
+      "Drill_1",
+      "Drill_2",
+      "Drill_3",
+      "Drill_4",
+      "Drill_5",
+      "Drill_6",
+      "Grinder_1",
+      "Grinder_2",
+      "Hedge_trimmer_1",
+      "Hedge_trimmer_2",
+      "Hedge_trimmer_3",
+      "Planer_1",
+      "Router_1",
+      "Sander_1",
+      "Sander_2",
+      "Sander_3",
+      "Saw_1",
+      "Saw_2",
+      "Saw_3",
+      "Saw_4",
+      "Saw_5",
+      "Saw_6",
+      "Saw_7",
+      "Saw_8"
+    ],
+    "Fan": [
+      "Fan_1",
+      "Fan_2"
+    ],
+    "Hairdryer": [
+      "Hair_drayer_1",
+      "Hair_drayer_2",
+      "Hair_drayer_3",
+      "Hair_drayer_4",
+      "Paint_stripper_1"
+    ],
+    "Compact Fluorescent Lamp": [
+      "Lamp_2"
+    ],
+    "Incandescent Light Bulb": [
+      "Lamp_3",
+      "Lamp_4"
+    ],
+    "Vacuum": [
+      "Vacuum_cleaner_1",
+      "Vacuum_cleaner_2",
+      "Vacuum_cleaner_3",
+      "Vacuum_cleaner_4",
+      "Vacuum_cleaner_5",
+      "Vacuum_cleaner_6",
+      "Vacuum_cleaner_7"
+    ]
+  },
+  "skipped": {
+    "uncertain:Lamp_1": 20
+  },
+  "caveats": [
+    "CC BY-NC 4.0: excluded by --commercial-only. Development and evaluation only.",
+    "Tools run with no load, so their current is below working level."
+  ]
+}

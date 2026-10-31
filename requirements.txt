@@ -15,3 +15,5 @@ soundfile>=0.12.0     # WHITED .flac
 pyarrow>=14.0.0       # CAFFEINE parquet
 nptdms>=1.7.0         # KAIST HVAC .tdms
 openpyxl>=3.1.0       # nonlinear_loads .xlsx
+av>=12.0.0            # COOLL 100 kHz .flac (libsndfile cannot decode it)
+h5py>=3.10.0          # BLOND MEDAL .hdf5

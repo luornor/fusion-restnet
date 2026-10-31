@@ -2,6 +2,9 @@
   "groups_written": true,
   "sources_with_recording_ids": [
     "plaid_v2",
+    "hifda_v2",
+    "whited_v2",
+    "cooll_v2",
     "lilac",
     "caffeine",
     "kaist_hvac",
@@ -9,7 +12,7 @@
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 50189,
-  "n_groups": 1110,
+  "n_windows": 71369,
+  "n_groups": 1281,
   "clean_group_split": true
 }

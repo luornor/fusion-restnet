@@ -1,0 +1,86 @@
+{
+  "air_conditioner": {
+    "model_class": "Air Conditioner",
+    "class_id": 0,
+    "status": "UNCERTAIN",
+    "note": "phase reference unverifiable (2025 addition)"
+  },
+  "coffeemaker": {
+    "model_class": "Coffee maker",
+    "class_id": 2,
+    "status": "SAFE",
+    "note": ""
+  },
+  "hairdryer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE",
+    "note": ""
+  },
+  "heater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "SAFE",
+    "note": ""
+  },
+  "laptop": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "SAFE",
+    "note": ""
+  },
+  "microwave": {
+    "model_class": "Microwave",
+    "class_id": 11,
+    "status": "SAFE",
+    "note": ""
+  },
+  "vacuum": {
+    "model_class": "Vacuum",
+    "class_id": 13,
+    "status": "SAFE",
+    "note": ""
+  },
+  "washing_machine": {
+    "model_class": "Washing Machine",
+    "class_id": 14,
+    "status": "UNCERTAIN",
+    "note": "phase +99 deg after correction; as air_conditioner"
+  },
+  "griddle": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "resistive"
+  },
+  "iron": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "EQUIVALENT",
+    "note": "clothes iron, resistive"
+  },
+  "light": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "UNCERTAIN",
+    "note": "lamp type not stated"
+  },
+  "charger": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  },
+  "computer": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  },
+  "monitor": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  }
+}

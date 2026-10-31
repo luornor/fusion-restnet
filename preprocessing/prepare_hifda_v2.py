@@ -55,14 +55,18 @@ MAINS_HZ = 50.0
 
 # lower-case HIFDA folder -> (model class, status, note)
 MAPPING = {
-    "air_conditioner": ("Air Conditioner", "SAFE",       ""),
+    # Added in the 2025 release. After the Heater skew correction its current
+    # leads by ~80 deg (PLAID and WHITED ACs: in phase to 10 deg lagging), so
+    # it was likely recorded with a different channel skew that cannot be
+    # calibrated without a resistive load from the same session.
+    "air_conditioner": ("Air Conditioner", "UNCERTAIN",  "phase reference unverifiable (2025 addition)"),
     "coffeemaker":     ("Coffee maker",    "SAFE",       ""),
     "hairdryer":       ("Hairdryer",       "SAFE",       ""),
     "heater":          ("Heater",          "SAFE",       ""),
     "laptop":          ("Laptop",          "SAFE",       ""),
     "microwave":       ("Microwave",       "SAFE",       ""),
     "vacuum":          ("Vacuum",          "SAFE",       ""),
-    "washing_machine": ("Washing Machine", "SAFE",       ""),
+    "washing_machine": ("Washing Machine", "UNCERTAIN",  "phase +99 deg after correction; as air_conditioner"),
     "griddle":         ("Heater",          "EQUIVALENT", "resistive"),
     "iron":            ("Heater",          "EQUIVALENT", "clothes iron, resistive"),
     "light":           ("Incandescent Light Bulb", "UNCERTAIN", "lamp type not stated"),

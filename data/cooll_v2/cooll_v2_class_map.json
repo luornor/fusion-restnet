@@ -1,0 +1,92 @@
+{
+  "Drill": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "6 drills, 500-850 W"
+  },
+  "Saw": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "8 saws: jigsaws, sabre, circular"
+  },
+  "Sander": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "3 orbital sanders"
+  },
+  "Grinder": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "2 angle grinders"
+  },
+  "Hedge_trimmer": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "3 hedge trimmers"
+  },
+  "Planer": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Router": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Fan": {
+    "model_class": "Fan",
+    "class_id": 4,
+    "status": "SAFE",
+    "note": "table fan, tower fan"
+  },
+  "Hair_drayer": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "SAFE",
+    "note": "4 units (sic: 'drayer' in the release)"
+  },
+  "Vacuum_cleaner": {
+    "model_class": "Vacuum",
+    "class_id": 13,
+    "status": "SAFE",
+    "note": "7 units"
+  },
+  "Paint_stripper": {
+    "model_class": "Hairdryer",
+    "class_id": 7,
+    "status": "EQUIVALENT",
+    "note": "heat gun: heater plus fan"
+  },
+  "Lamp_2": {
+    "model_class": "Compact Fluorescent Lamp",
+    "class_id": 3,
+    "status": "SAFE",
+    "note": "15 W CFL"
+  },
+  "Lamp_3": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "EQUIVALENT",
+    "note": "105 W halogen"
+  },
+  "Lamp_4": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "EQUIVALENT",
+    "note": "100 W halogen"
+  },
+  "Lamp_1": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "1.6 W LED lamp: no LED class"
+  }
+}

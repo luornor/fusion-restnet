@@ -53,17 +53,19 @@ appended:
 
 | Id | Class | Seeded from | Units |
 |---:|---|---|---:|
-| 16 | Single-phase induction motor | LILAC | 1 |
+| 16 | Single-phase induction motor | LILAC, WHITED (bench grinder) | 2 |
 | 17 | Three-phase induction motor | LILAC, KAIST HVAC | 4 |
 | 18 | VSD-driven motor | LILAC | 1 |
 | 19 | Fluorescent tube lighting | LILAC | 1 |
-| 20 | Universal-motor tool | LILAC | 1 |
+| 20 | Universal-motor tool | COOLL, WHITED, LILAC | 30 |
 | 21 | Espresso machine | CAFFEINE | 1 |
 | 22 | Inverter air conditioner | nonlinear_loads | 1 |
 | 23 | UPS | nonlinear_loads | 1 |
 
-Most new classes come from **one physical unit**. They are seeds for field
-data, not deployable classes. Ids 22 and 23 have too few windows to train and
+Most new classes come from **one or two physical units**. They are seeds for
+field data, not deployable classes. Universal-motor tool is the exception:
+24 COOLL tools, 5 WHITED and 1 LILAC, but COOLL is CC BY-NC and WHITED and
+LILAC state no licence, so the class is absent from the commercial set. Ids 22 and 23 have too few windows to train and
 are dropped by `--min-class-samples`.
 
 The model has no input for absolute power, because each window is scaled to
@@ -126,6 +128,17 @@ The legacy `prepare_whited.py` reads FLAC channel 0 as current. Channel 0
 is the **voltage**, so `data/whited` and every model trained on it learned
 mains voltage as the WHITED signatures. `prepare_whited_v2.py` reads
 channel 1.
+
+HIFDA's current channel lags its voltage channel by 37° on pure resistive
+loads, an acquisition offset. `prepare_hifda_v2.py` measures it on the
+Heater records and moves the window start to compensate. Its air
+conditioner and washing machine (added in the 2025 release) do not fit that
+calibration, so they are excluded unless `--include-uncertain`.
+
+| Set | Windows | Classes | Groups | Sources |
+|---|---:|---:|---:|---|
+| `data/combined_v2` | 71,369 | 24 | 1,281 | PLAID v2, HIFDA v2, WHITED v2, COOLL v2, LILAC, CAFFEINE, KAIST HVAC, nonlinear_loads |
+| `data/combined_commercial` | 52,658 | 20 | 441 | PLAID v2, HIFDA v2, CAFFEINE, KAIST HVAC, nonlinear_loads |
 
 Inference on raw signals (`segment_continuous_signal`) resamples **10** cycles
 into 400 samples, 40 per cycle. Neither PLAID nor the Fryze branch uses that.

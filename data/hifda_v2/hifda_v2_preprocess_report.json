@@ -1,0 +1,66 @@
+{
+  "source": "hifda_v2",
+  "generated_at": "2026-10-28T11:04:27+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 4800,
+  "n_groups": 48,
+  "class_counts": {
+    "Coffee maker": 600,
+    "Hairdryer": 600,
+    "Heater": 1800,
+    "Laptop": 600,
+    "Microwave": 600,
+    "Vacuum": 600
+  },
+  "groups_per_class": {
+    "Coffee maker": 6,
+    "Hairdryer": 6,
+    "Heater": 18,
+    "Laptop": 6,
+    "Microwave": 6,
+    "Vacuum": 6
+  },
+  "rms_a_median_per_class": {
+    "Coffee maker": 0.3265,
+    "Hairdryer": 0.6442,
+    "Heater": 0.6868,
+    "Laptop": 0.0381,
+    "Microwave": 0.3209,
+    "Vacuum": 0.1887
+  },
+  "licence": "CC BY 4.0",
+  "commercial_use": true,
+  "input": "..\\datasets_raw\\hifda_zenodo_14886758\\HIFDA_HF_electrical_signals_dataset\\Full_time_window_dataset",
+  "source_rate_hz": 100000,
+  "source_mains_hz": 50.0,
+  "retimed_to_50hz": false,
+  "bandwidth_hz": 1250,
+  "alignment": "voltage rising zero crossing, moved 37.1 deg later for the channel skew",
+  "channel_skew_deg": 37.06,
+  "units": "sensor volts (uncalibrated); use --current-prior",
+  "include_uncertain": false,
+  "records_used_per_appliance": {
+    "CoffeeMaker": 50,
+    "Griddle": 50,
+    "HairDryer": 50,
+    "Heater": 50,
+    "Iron": 50,
+    "Laptop": 50,
+    "Microwave": 50,
+    "Vacuum": 50
+  },
+  "skipped": {
+    "uncertain:Air_conditioner": 1,
+    "uncertain:Charger": 1,
+    "nan_windows": 0,
+    "uncertain:Computer": 1,
+    "uncertain:Light": 1,
+    "uncertain:Monitor": 1,
+    "uncertain:Washing_machine": 1
+  },
+  "caveats": [
+    "One physical unit per appliance type.",
+    "Spain 230 V / 50 Hz, the same supply as Ghana."
+  ]
+}
