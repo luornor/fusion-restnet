@@ -5,11 +5,12 @@
     "hifda_v2",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 52658,
-  "n_groups": 441,
+  "n_windows": 55463,
+  "n_groups": 461,
   "clean_group_split": true
 }

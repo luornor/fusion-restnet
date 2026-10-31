@@ -1,0 +1,106 @@
+{
+  "source": "blond",
+  "generated_at": "2026-10-31T15:27:23+00:00",
+  "timebase": "cycles",
+  "window_size": 400,
+  "n_windows": 2805,
+  "n_groups": 20,
+  "class_counts": {
+    "Fan": 430,
+    "Heater": 10,
+    "Laptop": 2335,
+    "Water kettle": 10,
+    "Universal-motor tool": 20
+  },
+  "groups_per_class": {
+    "Fan": 2,
+    "Heater": 1,
+    "Laptop": 15,
+    "Water kettle": 1,
+    "Universal-motor tool": 1
+  },
+  "rms_a_median_per_class": {
+    "Fan": 0.1389,
+    "Heater": 6.5016,
+    "Laptop": 0.2121,
+    "Water kettle": 7.2594,
+    "Universal-motor tool": 0.3621
+  },
+  "licence": "CC BY 4.0",
+  "commercial_use": true,
+  "input": "..\\datasets_raw\\blond_mediatum_1375836",
+  "source_rate_hz": "6400 (BLOND-50), 50000 (BLOND-250)",
+  "files_per_rate": {
+    "50000": 140,
+    "6400": 282
+  },
+  "source_mains_hz": 50.0,
+  "retimed_to_50hz": false,
+  "bandwidth_hz": 1250,
+  "alignment": "voltage rising zero crossing, current channel skew compensated",
+  "channel_skew_deg": 9.4,
+  "resistive_phase_deg_after_correction": [
+    -89.5,
+    -90.2
+  ],
+  "units": "A, via the per-dataset calibration_factor",
+  "include_uncertain": false,
+  "socket_files_used_per_type": {
+    "Laptop": 234,
+    "Fan": 43,
+    "Space Heater": 1,
+    "Kettle": 1,
+    "Multi-Tool": 2
+  },
+  "models_per_class": {
+    "Laptop": [
+      "blond:asusn750jv",
+      "blond:delle6540",
+      "blond:dellxps13",
+      "blond:generic",
+      "blond:lenovocarbonx1",
+      "blond:lenovol540",
+      "blond:lenovot420",
+      "blond:lenovot450",
+      "blond:lenovot530",
+      "blond:lenovox230i5",
+      "blond:lenovox230i7",
+      "blond:macbookpro13mid2014",
+      "blond:macbookpro15mid2014",
+      "blond:schenkerw502",
+      "blond:sonyvaiovgnfw54m"
+    ],
+    "Fan": [
+      "blond:euromvs16",
+      "blond:vovvts1641"
+    ],
+    "Heater": [
+      "blond:hellerasy1507"
+    ],
+    "Water kettle": [
+      "blond:severinwk3364"
+    ],
+    "Universal-motor tool": [
+      "blond:mannesmannm92577"
+    ]
+  },
+  "skipped": {
+    "uncertain:USB Charger": 221,
+    "unmapped:Printer": 26,
+    "uncertain:Monitor": 536,
+    "off_or_switching": 283,
+    "uncertain:PC": 102,
+    "unmapped:Electric Toothbrush": 12,
+    "uncertain:Battery Charger": 78,
+    "uncertain:Daylight": 16,
+    "unmapped:Projector": 8,
+    "unmapped:Dev Board": 63,
+    "uncertain:Paper Shredder": 14
+  },
+  "caveats": [
+    "Office building in Germany, 230 V / 50 Hz, CC BY 4.0.",
+    "Sampled download (fetch_blond.py): each socket-appliance instance on up to 3 weekdays.",
+    "Groups are appliance models, so several identical laptops count as one unit (no split leakage).",
+    "The Clatronic kettle on MEDAL-13 was not caught in the sampled office-hour files; Water kettle and Heater have one unit each, from the logged test sessions."
+  ]
+}

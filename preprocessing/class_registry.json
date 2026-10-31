@@ -41,6 +41,7 @@
     "lilac":           {"license": "none stated",                       "commercial_use": null,  "url": "https://www.cs.cit.tum.de/dis/resources/lilacd/",        "mains_hz": 50, "rate_hz": 50000,  "current_units": "A"},
     "caffeine":        {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://zenodo.org/records/8105706",                      "mains_hz": 50, "rate_hz": 6250,   "current_units": "A"},
     "kaist_hvac":      {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://data.mendeley.com/datasets/5tt3zb2pns/1",         "mains_hz": 60, "rate_hz": 100000, "current_units": "A"},
-    "nonlinear_loads": {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://data.mendeley.com/datasets/nkrhgfp9xy/1",         "mains_hz": 60, "rate_hz": 7663,   "current_units": "A"}
+    "nonlinear_loads": {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://data.mendeley.com/datasets/nkrhgfp9xy/1",         "mains_hz": 60, "rate_hz": 7663,   "current_units": "A"},
+    "blond":           {"license": "CC BY 4.0",                         "commercial_use": true,  "url": "https://mediatum.ub.tum.de/1375836",                      "mains_hz": 50, "rate_hz": 6400,   "current_units": "A", "timebase": "cycles", "notes": "prepare_blond.py: MEDAL per-socket current, 6.4 kHz (BLOND-50) and 50 kHz (BLOND-250), 9.4 deg channel skew compensated, unit groups"}
   }
 }

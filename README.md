@@ -57,15 +57,16 @@ appended:
 | 17 | Three-phase induction motor | LILAC, KAIST HVAC | 4 |
 | 18 | VSD-driven motor | LILAC | 1 |
 | 19 | Fluorescent tube lighting | LILAC | 1 |
-| 20 | Universal-motor tool | COOLL, WHITED, LILAC | 30 |
+| 20 | Universal-motor tool | COOLL, WHITED, LILAC, BLOND | 31 |
 | 21 | Espresso machine | CAFFEINE | 1 |
 | 22 | Inverter air conditioner | nonlinear_loads | 1 |
 | 23 | UPS | nonlinear_loads | 1 |
 
 Most new classes come from **one or two physical units**. They are seeds for
 field data, not deployable classes. Universal-motor tool is the exception:
-24 COOLL tools, 5 WHITED and 1 LILAC, but COOLL is CC BY-NC and WHITED and
-LILAC state no licence, so the class is absent from the commercial set. Ids 22 and 23 have too few windows to train and
+24 COOLL tools, 5 WHITED, 1 LILAC and 1 BLOND. COOLL is CC BY-NC and WHITED
+and LILAC state no licence, so the commercial set has only the BLOND
+multi-tool (20 windows, one unit). Ids 22 and 23 have too few windows to train and
 are dropped by `--min-class-samples`.
 
 The model has no input for absolute power, because each window is scaled to
@@ -137,8 +138,8 @@ calibration, so they are excluded unless `--include-uncertain`.
 
 | Set | Windows | Classes | Groups | Sources |
 |---|---:|---:|---:|---|
-| `data/combined_v2` | 71,369 | 24 | 1,281 | PLAID v2, HIFDA v2, WHITED v2, COOLL v2, LILAC, CAFFEINE, KAIST HVAC, nonlinear_loads |
-| `data/combined_commercial` | 52,658 | 20 | 441 | PLAID v2, HIFDA v2, CAFFEINE, KAIST HVAC, nonlinear_loads |
+| `data/combined_v2` | 74,174 | 24 | 1,301 | PLAID v2, HIFDA v2, WHITED v2, COOLL v2, LILAC, CAFFEINE, KAIST HVAC, nonlinear_loads, BLOND |
+| `data/combined_commercial` | 55,463 | 21 | 461 | PLAID v2, HIFDA v2, CAFFEINE, KAIST HVAC, nonlinear_loads, BLOND |
 
 Inference on raw signals (`segment_continuous_signal`) resamples **10** cycles
 into 400 samples, 40 per cycle. Neither PLAID nor the Fryze branch uses that.
@@ -156,6 +157,8 @@ python preprocessing/prepare_nonlinear_loads.py  # inverter AC, UPS snapshots
 python preprocessing/prepare_hifda_v2.py         # HIFDA full-length records with voltage (2025 version)
 python preprocessing/prepare_whited_v2.py        # WHITED current channel in amps, instance groups
 python preprocessing/prepare_cooll_v2.py         # COOLL all 12 types incl. 24 power tools (CC BY-NC)
+python preprocessing/fetch_blond.py ../datasets_raw/blond_mediatum_1375836  # sampled BLOND download, ~14 GB
+python preprocessing/prepare_blond.py            # BLOND office appliances (CC BY 4.0), 9.4 deg channel skew
 
 # 2. Merge. Default: every cycles-time-base source, plaid_v2 in place of legacy plaid.
 python preprocessing/merge_datasets.py --out-dir data/combined_v2

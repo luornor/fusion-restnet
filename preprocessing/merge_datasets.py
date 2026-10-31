@@ -21,6 +21,7 @@ Sources (in merge order; ids and licences come from preprocessing/class_registry
     caffeine        data/caffeine/X_caffeine.npy     CAFFEINE espresso, 50 Hz
     kaist_hvac      data/kaist_hvac/X_kaist_hvac.npy KAIST HVAC motor, 60->50 Hz
     nonlinear_loads data/nonlinear_loads/X_...npy    inverter AC, UPS etc., 60->50 Hz
+    blond           data/blond/X_blond.npy           BLOND office appliances, 50 Hz DE (CC BY 4.0)
 
 Output (in --out-dir, default data/combined):
     X_combined.npy       (N, 400)  float32
@@ -79,6 +80,7 @@ SOURCES = {
     "caffeine":        ("data/caffeine/X_caffeine.npy", "data/caffeine/y_caffeine.npy", "data/caffeine/groups_caffeine.npy"),
     "kaist_hvac":      ("data/kaist_hvac/X_kaist_hvac.npy", "data/kaist_hvac/y_kaist_hvac.npy", "data/kaist_hvac/groups_kaist_hvac.npy"),
     "nonlinear_loads": ("data/nonlinear_loads/X_nonlinear_loads.npy", "data/nonlinear_loads/y_nonlinear_loads.npy", "data/nonlinear_loads/groups_nonlinear_loads.npy"),
+    "blond":           ("data/blond/X_blond.npy", "data/blond/y_blond.npy", "data/blond/groups_blond.npy"),
 }
 ORIGINAL = ["plaid", "hifda", "whited", "cooll"]
 # A source listed here is dropped from "all" when its replacement exists.

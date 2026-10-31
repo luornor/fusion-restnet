@@ -8,11 +8,12 @@
     "lilac",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 71369,
-  "n_groups": 1281,
+  "n_windows": 74174,
+  "n_groups": 1301,
   "clean_group_split": true
 }

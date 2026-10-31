@@ -1,0 +1,74 @@
+{
+  "Laptop": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Kettle": {
+    "model_class": "Water kettle",
+    "class_id": 15,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Fan": {
+    "model_class": "Fan",
+    "class_id": 4,
+    "status": "SAFE",
+    "note": "desk fans"
+  },
+  "Space Heater": {
+    "model_class": "Heater",
+    "class_id": 8,
+    "status": "SAFE",
+    "note": ""
+  },
+  "Multi-Tool": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "SAFE",
+    "note": "Mannesmann M92577 rotary multi-tool, 135 W"
+  },
+  "Screen Motor": {
+    "model_class": "Single-phase induction motor",
+    "class_id": 16,
+    "status": "EQUIVALENT",
+    "note": "projector screen tubular motor"
+  },
+  "Monitor": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS, as WHITED Monitor"
+  },
+  "PC": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS with PFC"
+  },
+  "USB Charger": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS, 5-15 W: near the current resolution"
+  },
+  "Battery Charger": {
+    "model_class": "Laptop",
+    "class_id": 10,
+    "status": "UNCERTAIN",
+    "note": "SMPS"
+  },
+  "Daylight": {
+    "model_class": "Incandescent Light Bulb",
+    "class_id": 9,
+    "status": "UNCERTAIN",
+    "note": "Philips wake-up light: dimmed halogen"
+  },
+  "Paper Shredder": {
+    "model_class": "Universal-motor tool",
+    "class_id": 20,
+    "status": "UNCERTAIN",
+    "note": "motor type not verified"
+  }
+}

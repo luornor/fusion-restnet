@@ -7,7 +7,8 @@
     "lilac",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "timebase": "cycles",
   "source_timebases": {
@@ -18,7 +19,8 @@
     "lilac": "cycles",
     "caffeine": "cycles",
     "kaist_hvac": "cycles",
-    "nonlinear_loads": "cycles"
+    "nonlinear_loads": "cycles",
+    "blond": "cycles"
   },
   "missing_source_files": [],
   "dropped_for_licence": [],
@@ -30,7 +32,8 @@
     "lilac": "none stated",
     "caffeine": "CC BY 4.0",
     "kaist_hvac": "CC BY 4.0",
-    "nonlinear_loads": "CC BY 4.0"
+    "nonlinear_loads": "CC BY 4.0",
+    "blond": "CC BY 4.0"
   },
   "per_class": {
     "Air Conditioner": {
@@ -69,9 +72,10 @@
       ]
     },
     "Fan": {
-      "windows": 5431,
-      "recordings": 39,
+      "windows": 5861,
+      "recordings": 41,
       "sources": [
+        "blond",
         "cooll_v2",
         "plaid_v2",
         "whited_v2"
@@ -107,9 +111,10 @@
       ]
     },
     "Heater": {
-      "windows": 6191,
-      "recordings": 143,
+      "windows": 6201,
+      "recordings": 144,
       "sources": [
+        "blond",
         "hifda_v2",
         "lilac",
         "plaid_v2",
@@ -127,9 +132,10 @@
       ]
     },
     "Laptop": {
-      "windows": 5377,
-      "recordings": 50,
+      "windows": 7712,
+      "recordings": 65,
       "sources": [
+        "blond",
         "hifda_v2",
         "nonlinear_loads",
         "plaid_v2",
@@ -173,9 +179,10 @@
       ]
     },
     "Water kettle": {
-      "windows": 1180,
-      "recordings": 51,
+      "windows": 1190,
+      "recordings": 52,
       "sources": [
+        "blond",
         "lilac",
         "plaid_v2",
         "whited_v2"
@@ -212,9 +219,10 @@
       ]
     },
     "Universal-motor tool": {
-      "windows": 4528,
-      "recordings": 73,
+      "windows": 4548,
+      "recordings": 74,
       "sources": [
+        "blond",
         "cooll_v2",
         "lilac",
         "whited_v2"
@@ -251,11 +259,12 @@
     "lilac",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 71369,
-  "n_groups": 1281,
+  "n_windows": 74174,
+  "n_groups": 1301,
   "clean_group_split": true
 }

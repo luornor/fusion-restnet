@@ -21,8 +21,9 @@ Sibling repos in the same workspace: `lumina-agent` and `lumina-api`
   samples, starting at the voltage's rising zero crossing. The scripts are
   `preprocessing/prepare_*.py` and the `_v2` variants.
 - Merged sets, built by `preprocessing/merge_datasets.py`:
-  - `data/combined_v2`: 71,369 windows, 24 classes, 1,281 groups. Development only.
-  - `data/combined_commercial`: 52,658 windows, 20 classes, 441 groups. Use for any model that is sold.
+  - `data/combined_v2`: 74,174 windows, 24 classes, 1,301 groups. Development only.
+  - `data/combined_commercial`: 55,463 windows, 21 classes, 461 groups. Use for any model that is sold.
+  - BLOND (`data/blond`, 2,805 windows, 20 appliance-model groups) is included in both.
   - The `X`/`y`/groups arrays are gitignored. Rebuild them with the merge commands in README.md.
 - **No model has been trained on the v2 data yet.** The shipped
   `multi-source-v1` (F1 macro 0.79) was trained on bad data:
@@ -35,18 +36,15 @@ Sibling repos in the same workspace: `lumina-agent` and `lumina-api`
 
 ## Next steps, in order
 
-1. **BLOND** (CC BY 4.0, office loads, 54 appliances):
-   - Status: a sampled download is under way into `../datasets_raw/blond_mediatum_1375836/`, via `preprocessing/fetch_blond.py`. That folder must hold `appliance_log.json`. Rerunning the script skips files that are already complete.
-   - Next: write `prepare_blond.py`:
-     - Read the MEDAL HDF5 files.
-     - Map sockets to appliances with `appliance_log.json`. A group is one physical unit: medal, socket and appliance name.
-     - Apply `channel_skew_deg≈9.5`, measured on the kettle and the heater.
-     - Drop windows below roughly 0.1 A RMS.
-   - Details: docs section 11.
+1. **LIT** (UTFPR): the zips are in `../datasets_raw/lit_utfpr/`. Every inner file is zip-encrypted, so the password from the user's registration email is needed.
+   - Use Synthetic `sy1`: 26 types × 16 recordings, one appliance each, with event labels. Its 3 `.bin` channels per recording are not yet decoded.
+   - `sy2`, `sy3` and `sy8` are multi-load, Natural is a 2 h aggregate, and Simulated is model output: skip Simulated.
+   - 127 V / 60 Hz, 15 kHz. Licence: check the registration email.
 2. Prepare any other raw datasets the user drops in `../datasets_raw/`:
    - **TDHA** (Science Databank 10.57760/sciencedb.13172): 51.2 kHz V+I, 220 V/50 Hz. Docs section 11 lists which zips to fetch.
    - **Houidi** (IEEE DataPort): 61 appliances, 8 cycles of V+I at 50 Hz, already the window shape we use.
    - **CREAM** (mediaTUM, rsync details on the record page).
+   - **BLOND, optional:** a targeted fetch of MEDAL-13 (Clatronic kettle, 2017-02 to 2017-06). The sampled office-hour files missed it.
    - **FIRED** (rsync, 2 kHz per appliance): the server was down on 2026-10-29.
    - **NLN-EMP pumps** (4TU): the server was down on 2026-10-29.
 

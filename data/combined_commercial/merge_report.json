@@ -4,7 +4,8 @@
     "hifda_v2",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "timebase": "cycles",
   "source_timebases": {
@@ -12,7 +13,8 @@
     "hifda_v2": "cycles",
     "caffeine": "cycles",
     "kaist_hvac": "cycles",
-    "nonlinear_loads": "cycles"
+    "nonlinear_loads": "cycles",
+    "blond": "cycles"
   },
   "missing_source_files": [],
   "dropped_for_licence": [
@@ -25,7 +27,8 @@
     "hifda_v2": "CC BY 4.0",
     "caffeine": "CC BY 4.0",
     "kaist_hvac": "CC BY 4.0",
-    "nonlinear_loads": "CC BY 4.0"
+    "nonlinear_loads": "CC BY 4.0",
+    "blond": "CC BY 4.0"
   },
   "per_class": {
     "Air Conditioner": {
@@ -58,9 +61,10 @@
       ]
     },
     "Fan": {
-      "windows": 4391,
-      "recordings": 31,
+      "windows": 4821,
+      "recordings": 33,
       "sources": [
+        "blond",
         "plaid_v2"
       ]
     },
@@ -88,9 +92,10 @@
       ]
     },
     "Heater": {
-      "windows": 3308,
-      "recordings": 31,
+      "windows": 3318,
+      "recordings": 32,
       "sources": [
+        "blond",
         "hifda_v2",
         "plaid_v2"
       ]
@@ -103,9 +108,10 @@
       ]
     },
     "Laptop": {
-      "windows": 5137,
-      "recordings": 48,
+      "windows": 7472,
+      "recordings": 63,
       "sources": [
+        "blond",
         "hifda_v2",
         "nonlinear_loads",
         "plaid_v2"
@@ -143,9 +149,10 @@
       ]
     },
     "Water kettle": {
-      "windows": 30,
-      "recordings": 1,
+      "windows": 40,
+      "recordings": 2,
       "sources": [
+        "blond",
         "plaid_v2"
       ]
     },
@@ -154,6 +161,13 @@
       "recordings": 25,
       "sources": [
         "kaist_hvac"
+      ]
+    },
+    "Universal-motor tool": {
+      "windows": 20,
+      "recordings": 1,
+      "sources": [
+        "blond"
       ]
     },
     "Espresso machine": {
@@ -184,11 +198,12 @@
     "hifda_v2",
     "caffeine",
     "kaist_hvac",
-    "nonlinear_loads"
+    "nonlinear_loads",
+    "blond"
   ],
   "sources_with_per_window_ids": [],
   "sources_missing_ids": [],
-  "n_windows": 52658,
-  "n_groups": 441,
+  "n_windows": 55463,
+  "n_groups": 461,
   "clean_group_split": true
 }

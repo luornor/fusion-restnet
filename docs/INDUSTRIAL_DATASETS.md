@@ -308,7 +308,22 @@ windows. It does not show how the model performs on real current.
 - **Channel skew:** resistive loads read −99.8° (kettle, BLOND-50, 1,578 W) and −99.0° (heater, BLOND-250, 1,465 W), with third harmonic below 1% of the fundamental. That is a ~9.5° current-channel lag on both rates, the same kind of offset as HIFDA. Compensate with `channel_skew_deg`.
 - **Resolution:** 5.4 mA per LSB on sockets 2–6 and 15 mA on socket 1. USB chargers (5–15 W, about 0.05 A) are mostly quantisation noise, so filter windows by RMS.
 - **Holidays:** 2016-10-03 is a German holiday and every socket was in standby. The downloader skips weekends and holidays.
-- **Sampled download:** `preprocessing/fetch_blond.py` takes one ordinary weekday per socket-layout change plus evenly spaced extra weekdays. It fetches 2 files per MEDAL per day in BLOND-50 and 4 in BLOND-250, plus the test sessions. That is roughly 20–25 GB instead of 38.7 TB.
+- **Sampled download:** `preprocessing/fetch_blond.py` covers each of the 90 socket-appliance instances on up to 3 ordinary weekdays, fetching only the MEDAL that holds it. That is 2 files per day in BLOND-50 and 4 in BLOND-250, plus the test sessions: 422 files, 14 GB. A first plan that fetched every MEDAL for each layout change came to 84.5 GB.
+- **Result (`prepare_blond.py`):** 2,805 windows in 20 appliance-model groups.
+
+  | Class | Windows | Units |
+  |---|---:|---:|
+  | Laptop | 2,335 | 15 models |
+  | Fan | 430 | 2 |
+  | Universal-motor tool (multi-tool) | 20 | 1 |
+  | Heater | 10 | 1 |
+  | Water kettle | 10 | 1 |
+
+  - Resistive phase after correction: −89.5° and −90.2°.
+  - Monitors, PCs, chargers, the daylight lamp and the shredder are UNCERTAIN mappings, kept out of the default build.
+  - The printer and projector are unmapped.
+  - The Clatronic kettle (MEDAL-13) was not running in any sampled file.
+  - Groups are model names, because the multi-tool moved between MEDAL-1 and MEDAL-2.
 
 ### TDHA
 
